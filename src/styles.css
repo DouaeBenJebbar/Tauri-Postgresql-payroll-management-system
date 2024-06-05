@@ -1,0 +1,46 @@
+html,
+body,
+#root,
+.app {
+  height: 100%;
+  width: 100%;
+  font-family: "Source Sans Pro", sans-serif;
+  position: relative;
+  overflow-y: auto;
+}
+
+.app {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.content {
+  transition: margin-left 0.5s ease-in-out, width 0.5s ease-in-out;  /* Slower, smoother transition */
+  margin-left: 270px;  /* Initial width of the sidebar */
+  width: calc(100% - 270px);
+}
+
+.content.collapsed {
+  margin-left: 80px;  /* Width of the collapsed sidebar */
+  width: calc(100% - 80px);
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #e0e0e0;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #888;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
