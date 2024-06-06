@@ -25,3 +25,9 @@ pub struct NewSpecialty {
     pub specialite: String,
     pub nombre_annees: i32,
 }
+
+#[derive(Serialize, Deserialize, FromRow)]
+pub struct Bank {
+    pub id: i32,
+    pub nom: String,
+}

@@ -1,6 +1,6 @@
 use tauri::State;
 use sqlx::PgPool;
-use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident};
+use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident,Bank};
 use tokio::sync::Mutex;
 
 
@@ -18,6 +18,20 @@ pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<
         }
         Err(e) => Err(format!("Failed to connect to the database: {}", e)),
     }
+}
+#[tauri::command]
+pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Bank>, MyError> {
+    let pool = state.pool.lock().await;
+    let pool = pool.as_ref().ok_or_else(|| MyError {
+        message: "Database not connected".to_string(),
+    })?;
+    
+    let banks = sqlx::query_as::<_, Bank>("SELECT id_bank, nom FROM banks")
+        .fetch_all(pool)
+        .await
+        .map_err(MyError::from)?;
+
+    Ok(banks)
 }
 
 #[tauri::command]
@@ -134,6 +148,7 @@ pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, S
             residents.is_titulaire,
             residents.rib,
             residents.nombre_enfants,
+            residents.id_bank,
             specialty.name AS specialty_name
         FROM residents
         LEFT JOIN specialty ON residents.id_specialty = specialty.id
@@ -154,14 +169,15 @@ pub async fn add_resident(pool: State<'_, AppState>, resident: NewResident) -> R
     // Perform any validation checks here
   
     sqlx::query!(
-      "INSERT INTO residents (cin, nom_prenom, date_debut, id_specialty, is_titulaire, rib, nombre_enfants) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      "INSERT INTO residents (cin, nom_prenom, date_debut, id_specialty, is_titulaire, rib, nombre_enfants, id_bank) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
       resident.cin,
       resident.nom_prenom,
       resident.date_debut,
       resident.id_specialty,
       resident.is_titulaire,
       resident.rib,
-      resident.nombre_enfants
+      resident.nombre_enfants,
+      resident.id_bank
     )
     .execute(pool)
     .await

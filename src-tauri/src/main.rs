@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 mod commands;
 mod models;
 
-use commands::{connect_db, login, get_specialties, add_specialty, delete_specialty, modify_specialty, get_residents, add_resident, delete_resident,modify_resident};
+use commands::{connect_db, login,get_banks, get_specialties, add_specialty, delete_specialty, modify_specialty, get_residents, add_resident, delete_resident,modify_resident};
 use models::AppState;
 
 fn main() {
@@ -20,6 +20,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             connect_db,
             login,
+            get_banks,
             get_specialties,
             add_specialty,
             delete_specialty,

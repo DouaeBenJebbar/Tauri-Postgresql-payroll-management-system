@@ -9,6 +9,7 @@ pub use specialty::Specialty;
 pub use resident::Resident;
 pub use specialty:: NewSpecialty;
 pub use resident:: NewResident;
+pub use specialty::Bank;
 
 use serde::Serialize;
 use tokio::sync::Mutex;
