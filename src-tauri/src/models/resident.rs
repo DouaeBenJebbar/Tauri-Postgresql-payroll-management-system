@@ -15,6 +15,7 @@ pub struct Resident {
     pub rib: i32, 
     pub nombre_enfants: i32, 
     pub specialty_name: Option<String>,
+    pub bank_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

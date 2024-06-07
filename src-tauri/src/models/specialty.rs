@@ -26,8 +26,17 @@ pub struct NewSpecialty {
     pub nombre_annees: i32,
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize)]
 pub struct Bank {
     pub id: i32,
-    pub nom: String,
+    pub bank_name: String,
+}
+
+impl FromRow<'_, sqlx::postgres::PgRow> for Bank {
+    fn from_row(row: &sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            bank_name: row.try_get("bank_name")?,
+        })
+    }
 }

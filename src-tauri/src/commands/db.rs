@@ -26,7 +26,7 @@ pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Bank>, MyError>
         message: "Database not connected".to_string(),
     })?;
     
-    let banks = sqlx::query_as::<_, Bank>("SELECT id_bank, nom FROM banks")
+    let banks = sqlx::query_as::<_, Bank>("SELECT id, bank_name FROM bank")
         .fetch_all(pool)
         .await
         .map_err(MyError::from)?;
@@ -135,31 +135,53 @@ pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, S
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
 
-    let residents = sqlx::query_as!(
-        Resident,
+    // Fetch records with the correct type annotations
+    let records = sqlx::query!(
         r#"
         SELECT 
-            residents.id_resident,
-            residents.cin,
-            residents.nom_prenom,
-            residents.date_debut,
-            residents.id_specialty,
-            residents.date_fin,
-            residents.is_titulaire,
-            residents.rib,
-            residents.nombre_enfants,
-            residents.id_bank,
-            specialty.name AS specialty_name
+            residents.id_resident as "id_resident",
+            residents.cin as "cin",
+            residents.nom_prenom as "nom_prenom",
+            residents.date_debut as "date_debut",
+            residents.id_specialty as "id_specialty",
+            residents.date_fin as "date_fin",
+            residents.is_titulaire as "is_titulaire",
+            residents.rib as "rib",
+            residents.nombre_enfants as "nombre_enfants",
+            residents.id_bank as "id_bank",
+            specialty.name as "specialty_name",
+            bank.bank_name as "bank_name"
         FROM residents
         LEFT JOIN specialty ON residents.id_specialty = specialty.id
+        LEFT JOIN bank ON residents.id_bank = bank.id
         "#
     )
     .fetch_all(pool)
     .await
     .map_err(|e| format!("Failed to fetch residents: {}", e))?;
 
+    let residents: Vec<Resident> = records
+        .into_iter()
+        .map(|record| Resident {
+            id_resident: record.id_resident.expect("id_resident is None"),
+            cin: record.cin.expect("cin is None"),
+            nom_prenom: record.nom_prenom,
+            date_debut: record.date_debut.expect("date_debut is None"),
+            id_specialty: record.id_specialty.expect("id_specialty is None"),
+            date_fin: record.date_fin,
+            is_titulaire: record.is_titulaire,
+            rib: record.rib.expect("rib is None"),
+            nombre_enfants: record.nombre_enfants.expect("nombre_enfants is None"),
+            id_bank: record.id_bank.expect("id_bank is None"),
+            specialty_name: record.specialty_name,
+            bank_name: Some(record.bank_name), // Wrap bank_name in Some
+        })
+        .collect();
+
     Ok(residents)
 }
+
+
 
 #[tauri::command]
 pub async fn add_resident(pool: State<'_, AppState>, resident: NewResident) -> Result<(), String> {

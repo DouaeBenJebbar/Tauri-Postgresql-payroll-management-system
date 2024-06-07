@@ -16,6 +16,8 @@ const Residents = () => {
   const [specialties, setSpecialties] = useState([]);
   const [searchInput, setSearchInput] = useState("");
   const [filteredResidents, setFilteredResidents] = useState([]);
+  const [banks, setBanks] = useState([]);
+  const [selectedBank, setSelectedBank] = useState("");
   const [open, setOpen] = useState(false);
   const [newResident, setNewResident] = useState({
     id:"",
@@ -25,7 +27,8 @@ const Residents = () => {
     id_specialty: "",
     is_titulaire: false,
     rib: "",
-    nombre_enfants: 0
+    nombre_enfants: 0,
+    id_bank: "",
   });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -48,6 +51,7 @@ const Residents = () => {
         is_titulaire: resident.is_titulaire,
         rib: resident.rib,
         nombre_enfants: resident.nombre_enfants,
+        id_bank: resident.id_bank,
       });
       setFormMode("edit");
       setOpen(true);
@@ -80,7 +84,8 @@ const Residents = () => {
       id_specialty: "",
       is_titulaire: false,
       rib: "",
-      nombre_enfants: 0
+      nombre_enfants: 0,
+      id_bank: "",
     });
   };
 
@@ -152,7 +157,6 @@ const Residents = () => {
     const fetchSpecialties = async () => {
       try {
         const data = await invoke("get_specialties");
-        console.log("Specialties data:", data); // Log the fetched data
         setSpecialties(data);
         setLoading(false); // Set loading to false once data is fetched
       } catch (error) {
@@ -160,7 +164,16 @@ const Residents = () => {
         setLoading(false); // Set loading to false even if there's an error
       }
     };
-
+    const fetchBanks = async () => {
+      try {
+        const data = await invoke("get_banks");
+        setBanks(data);
+      } catch (error) {
+        console.error("Failed to fetch banks", error);
+      }
+    };
+  
+    fetchBanks();
     fetchResidents();
     fetchSpecialties();
 
@@ -283,14 +296,14 @@ const Residents = () => {
         }}
       >
         <DataGrid
-          rows={filteredResidents}
-          columns={columns}
-          getRowId={(row) => row.cin}
-          disableSelectionOnClick
-          autoHeight
-          hideFooter
-          pagination={true} // or remove this prop if you want to use default pagination behavior
-        />
+        rows={filteredResidents}
+        columns={columns}
+        getRowId={(row) => row.cin}
+        disableSelectionOnClick
+        autoHeight
+        hideFooter
+      />
+
       </Box>
 
       <Dialog open={open} onClose={handleClose}>
@@ -395,6 +408,46 @@ const Residents = () => {
             onChange={handleInputChange}
             autoComplete="off"
           />
+          <TextField
+            margin="dense"
+            id="id_bank"
+            name="id_bank"
+            label="Banque"
+            select
+            fullWidth
+            value={newResident.id_bank}
+            onChange={handleInputChange}
+            autoComplete="off"
+            SelectProps={{
+              MenuProps: {
+                PaperProps: {
+                  style: {
+                    maxHeight: 200,
+                    width: '40%', 
+                    marginTop: 8, 
+                  },
+                },
+              },
+              renderValue: (selected) => {
+                if (selected === "") {
+                  return <em>Sélectionnez une banque</em>;
+                }
+                const selectedBank = banks.find((bank) => bank.id === selected);
+                return selectedBank.bank_name;
+              },
+            }}
+          >
+            {loading ? (
+              <MenuItem disabled>Loading...</MenuItem>
+            ) : (
+              banks.map((bank) => (
+                <MenuItem key={bank.id} value={bank.id}>
+                  {bank.bank_name}
+                </MenuItem>
+              ))
+            )}
+          </TextField>
+
           <TextField
             margin="dense"
             id="nombre_enfants"
