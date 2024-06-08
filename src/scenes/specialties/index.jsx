@@ -16,7 +16,11 @@ const Specialties = () => {
   const [newSpecialty, setNewSpecialty] = useState({ specialite: "", nombre_annees: "" });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarMessageType, setSnackbarMessageType] = useState("success"); 
   const [formMode, setFormMode] = useState("add"); 
+  const [specialtyToDelete, setSpecialtyToDelete] = useState(null);
+const [confirmationOpen, setConfirmationOpen] = useState(false);
+
 
 
   const handleAddClick = () => {
@@ -31,22 +35,31 @@ const Specialties = () => {
     setOpen(true);
   };
 
-  const handleDeleteClick = async (specialite) => {
+  const handleDeleteClick = (specialite) => {
+    setSpecialtyToDelete(specialite);
+    setConfirmationOpen(true);
+  };
+  
+
+  const handleConfirmDelete = async () => {
     try {
-      await invoke("delete_specialty", { specialtyName: specialite });
+      await invoke("delete_specialty", { specialtyName: specialtyToDelete });
       const updatedSpecialties = await invoke("get_specialties");
       setSpecialties(updatedSpecialties);
       setFilteredSpecialties(updatedSpecialties);
-      setSnackbarMessage("Specialty deleted successfully");
+      setSnackbarMessageType("success");
+      setSnackbarMessage("Spécialité supprimée avec succès");
       setSnackbarOpen(true);
     } catch (error) {
       console.error("Failed to delete specialty", error);
-      setSnackbarMessage("Failed to delete specialty");
+      setSnackbarMessageType("error");
+      setSnackbarMessage("Échec de la suppression de la spécialité");
       setSnackbarOpen(true);
+    } finally {
+      setConfirmationOpen(false);
     }
   };
-
-
+  
   const handleClose = () => {
     setOpen(false);
     setNewSpecialty({ specialite: "", nombre_annees: "" });
@@ -64,6 +77,7 @@ const Specialties = () => {
     try {
       // Validate form fields
       if (!newSpecialty.specialite || !newSpecialty.nombre_annees) {
+        setSnackbarMessageType("error");
         throw new Error("Veuillez remplir tous les champs.");
       }
   
@@ -81,6 +95,7 @@ const Specialties = () => {
   
         await invoke("add_specialty", { specialty: specialtyToSubmit });
   
+        setSnackbarMessageType("success");
         setSnackbarMessage("Spécialité ajoutée avec succès!");
       } else if (formMode === "edit") {
         // Perform specialty modification
@@ -91,6 +106,7 @@ const Specialties = () => {
   
         await invoke("modify_specialty", { specialty: specialtyToSubmit });
   
+        setSnackbarMessageType("success");
         setSnackbarMessage("Spécialité modifiée avec succès!");
       }
   
@@ -101,7 +117,8 @@ const Specialties = () => {
       handleClose();
     } catch (error) {
       console.error("Failed to add or modify specialty", error);
-      setSnackbarMessage(error.message || "Failed to add or modify specialty.");
+      setSnackbarMessageType("error");
+      setSnackbarMessage(error.message || "Échec d'ajout ou de modification de la spécialité.");
     } finally {
       setSnackbarOpen(true);
     }
@@ -122,7 +139,7 @@ const Specialties = () => {
     {
       field: "action",
       headerName: "Action",
-      flex: 1,
+      flex: 0.5,
       renderCell: (params) => (
         <Box>
           <Button
@@ -136,13 +153,14 @@ const Specialties = () => {
           </Button>
           <Button
             variant="contained"
-            color="secondary"
+            sx={{ bgcolor: '#f44336', color: '#fff', '&:hover': { bgcolor: '#d32f2f' } }}
             size="small"
             onClick={() => handleDeleteClick(params.row.specialite)}
           >
             Supprimer
           </Button>
         </Box>
+        
       ),
     },
   ];
@@ -285,16 +303,36 @@ const Specialties = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog open={confirmationOpen} onClose={() => setConfirmationOpen(false)}>
+        <DialogTitle>Confirmation de suppression</DialogTitle>
+        <DialogContent>
+          <Box fontWeight="bold">
+            Êtes-vous sûr de vouloir supprimer la spécialité "{specialtyToDelete}" ?
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmationOpen(false)} color="primary">
+            Annuler
+          </Button>
+          <Button onClick={handleConfirmDelete} sx={{color: '#f44336', '&:hover': { color: '#d32f2f' } }}>
+            Supprimer
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
         onClose={() => setSnackbarOpen(false)}
       >
-        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarMessage.includes("Failed") ? "error" : "success"} sx={{ width: '100%' }}>
-          {snackbarMessage}
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={snackbarMessageType} // Use the new state here
+          sx={{ width: "100%" }}
+        >
+          {snackbarMessage || "Success message"} {/* Provide a default success message */}
         </Alert>
-      </Snackbar>
+    </Snackbar>
     </Box>
   );
 };

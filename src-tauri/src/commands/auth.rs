@@ -1,5 +1,4 @@
 use tauri::State;
-use serde::Deserialize;
 use sqlx::Row;
 use crate::models::{AppState, LoginPayload};
 

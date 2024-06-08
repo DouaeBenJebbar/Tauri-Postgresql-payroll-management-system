@@ -2,6 +2,7 @@ pub mod db_config;
 pub mod login_payload;
 pub mod specialty;
 pub mod resident;
+pub mod payments;
 
 pub use db_config::DbConfig;
 pub use login_payload::LoginPayload;
@@ -10,6 +11,7 @@ pub use resident::Resident;
 pub use specialty:: NewSpecialty;
 pub use resident:: NewResident;
 pub use specialty::Bank;
+pub use payments::Payment;
 
 use serde::Serialize;
 use tokio::sync::Mutex;

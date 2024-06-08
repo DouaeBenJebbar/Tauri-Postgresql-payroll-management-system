@@ -3,13 +3,13 @@
     windows_subsystem = "windows"
 )]
 
-use tauri::{State, command};
+
 use tokio::sync::Mutex;
 
 mod commands;
 mod models;
 
-use commands::{connect_db, login,get_banks, get_specialties, add_specialty, delete_specialty, modify_specialty, get_residents, add_resident, delete_resident,modify_resident};
+use commands::{connect_db, login,get_banks, get_specialties, add_specialty, delete_specialty, modify_specialty, get_residents, add_resident, delete_resident,modify_resident, get_payments};
 use models::AppState;
 
 fn main() {
@@ -28,7 +28,8 @@ fn main() {
             get_residents,
             add_resident,
             delete_resident,
-            modify_resident
+            modify_resident,
+            get_payments
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

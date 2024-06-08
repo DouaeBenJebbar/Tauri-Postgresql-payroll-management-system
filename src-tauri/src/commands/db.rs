@@ -1,8 +1,10 @@
 use tauri::State;
 use sqlx::PgPool;
-use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident,Bank};
-use tokio::sync::Mutex;
+use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident,Bank,Payment};
+use thiserror::Error;
+use std::fmt;
 
+//connecting to database
 
 #[tauri::command]
 pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<(), String> {
@@ -19,6 +21,7 @@ pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<
         Err(e) => Err(format!("Failed to connect to the database: {}", e)),
     }
 }
+//managing banks
 #[tauri::command]
 pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Bank>, MyError> {
     let pool = state.pool.lock().await;
@@ -33,6 +36,8 @@ pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Bank>, MyError>
 
     Ok(banks)
 }
+
+//managing specialties
 
 #[tauri::command]
 pub async fn get_specialties(state: State<'_, AppState>) -> Result<Vec<Specialty>, MyError> {
@@ -130,6 +135,100 @@ pub async fn modify_specialty(pool: State<'_, AppState>, specialty: Specialty) -
     Ok(())
 }
 
+//managing residents 
+
+#[derive(Debug, Error)]
+pub enum ValidationError {
+    #[error("Le CIN ne peut pas être vide")]
+    EmptyCIN,
+    #[error("Le RIB doit être une valeur numérique")]
+    InvalidRIB,
+    #[error("Le nombre d'enfants ne peut pas être négatif")]
+    InvalidNumberOfChildren,
+    #[error("Veuillez sélectionner une spécialité")]
+    EmptySpecialtyID,
+    #[error("Veuillez sélectionner une banque")]
+    EmptyBankID,
+}
+
+
+trait ValidatableResident {
+    fn cin(&self) -> &str;
+    fn rib(&self) -> i32; // Assuming rib is an integer, adjust the type as necessary
+    fn nombre_enfants(&self) -> i32;
+    fn id_specialty(&self) -> i32;
+    fn id_bank(&self) -> i32;
+}
+
+impl ValidatableResident for Resident {
+    fn cin(&self) -> &str {
+        &self.cin
+    }
+
+    fn rib(&self) -> i32 {
+        self.rib
+    }
+
+    fn nombre_enfants(&self) -> i32 {
+        self.nombre_enfants
+    }
+
+    fn id_specialty(&self) -> i32 {
+        self.id_specialty
+    }
+
+    fn id_bank(&self) -> i32 {
+        self.id_bank
+    }
+}
+
+impl ValidatableResident for NewResident {
+    fn cin(&self) -> &str {
+        &self.cin
+    }
+
+    fn rib(&self) -> i32 {
+        self.rib
+    }
+
+    fn nombre_enfants(&self) -> i32 {
+        self.nombre_enfants
+    }
+
+    fn id_specialty(&self) -> i32 {
+        self.id_specialty
+    }
+
+    fn id_bank(&self) -> i32 {
+        self.id_bank
+    }
+}
+
+fn validate_resident<R: ValidatableResident>(resident: &R) -> Result<(), String> {
+    if resident.cin().trim().is_empty() {
+        return Err(ValidationError::EmptyCIN.to_string());
+    }
+
+    if !resident.rib().to_string().chars().all(|c| c.is_numeric()) {
+        return Err(ValidationError::InvalidRIB.to_string());
+    }
+
+    if resident.nombre_enfants() < 0 {
+        return Err(ValidationError::InvalidNumberOfChildren.to_string());
+    }
+
+    if resident.id_specialty() <= 0 {
+        return Err(ValidationError::EmptySpecialtyID.to_string());
+    }
+
+    if resident.id_bank() <= 0 {
+        return Err(ValidationError::EmptyBankID.to_string());
+    }
+
+    Ok(())
+}
+
+
 #[tauri::command]
 pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, String> {
     let pool = pool.pool.lock().await;
@@ -154,6 +253,7 @@ pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, S
         FROM residents
         LEFT JOIN specialty ON residents.id_specialty = specialty.id
         LEFT JOIN bank ON residents.id_bank = bank.id
+        WHERE residents.date_fin > CURRENT_DATE
         "#
     )
     .fetch_all(pool)
@@ -188,7 +288,8 @@ pub async fn add_resident(pool: State<'_, AppState>, resident: NewResident) -> R
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
   
-    // Perform any validation checks here
+    validate_resident(&resident).map_err(|e| e.to_string())?;
+
   
     sqlx::query!(
       "INSERT INTO residents (cin, nom_prenom, date_debut, id_specialty, is_titulaire, rib, nombre_enfants, id_bank) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
@@ -229,7 +330,7 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
 
-    // Perform any validation checks here
+    validate_resident(&resident).map_err(|e| e.to_string())?;
 
     sqlx::query!(
         "UPDATE residents SET 
@@ -256,4 +357,21 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
     .map_err(|e| format!("Failed to modify resident: {}", e))?;
 
     Ok(())
+}
+
+
+//manage payments
+#[tauri::command]
+pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, MyError> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or_else(|| MyError {
+        message: "Database not connected".to_string(),
+    })?;
+
+    let payments = sqlx::query_as::<_, Payment>("SELECT id_payment, id_resident, date_from, date_to, amount, allocations_fam, worked_days FROM payment")
+        .fetch_all(pool)
+        .await
+        .map_err(MyError::from)?;
+
+    Ok(payments)
 }

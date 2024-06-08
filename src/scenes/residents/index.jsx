@@ -32,7 +32,10 @@ const Residents = () => {
   });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarMessageType, setSnackbarMessageType] = useState("success"); 
   const [formMode, setFormMode] = useState("add");
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [residentToDelete, setResidentToDelete] = useState(null);
 
   const handleAddClick = () => {
     setFormMode("add");
@@ -59,20 +62,37 @@ const Residents = () => {
   };
   
 
-  const handleDeleteClick = async (cin) => {
-    const residentToDelete = residents.find((resident) => resident.cin === cin);
-    try {
-      await invoke("delete_resident", { cin });
-      const updatedResidents = await invoke("get_residents");
-      setResidents(updatedResidents);
-      setFilteredResidents(updatedResidents);
-      setSnackbarMessage("Resident deleted successfully");
-      setSnackbarOpen(true);
-    } catch (error) {
-      console.error("Failed to delete resident", error);
-      setSnackbarMessage("Failed to delete resident");
-      setSnackbarOpen(true);
+  const handleDeleteClick = (cin) => {
+    const resident = residents.find((resident) => resident.cin === cin);
+    if (resident) {
+      setResidentToDelete(resident);
+      setConfirmationOpen(true);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (residentToDelete) {
+      try {
+        await invoke("delete_resident", { cin: residentToDelete.cin });
+        const updatedResidents = await invoke("get_residents");
+        setResidents(updatedResidents);
+        setFilteredResidents(updatedResidents);
+        setSnackbarMessage("Résident supprimé avec succès");
+        setSnackbarMessageType("success");
+        setSnackbarOpen(true);
+      } catch (error) {
+        console.error("Failed to delete resident", error);
+        setSnackbarMessage("Échec de la suppression du résident");
+        setSnackbarMessageType("error");
+        setSnackbarOpen(true);
+      }
+    }
+    setConfirmationOpen(false);
+  };
+
+  const handleCancelDelete = () => {
+    setResidentToDelete(null);
+    setConfirmationOpen(false);
   };
   
   const handleClose = () => {
@@ -126,9 +146,11 @@ const Residents = () => {
   
       if (formMode === "add") {
         await invoke("add_resident", { resident });
+        setSnackbarMessageType("success");
         setSnackbarMessage("Resident ajouté avec succès!");
       } else if (formMode === "edit") {
         await invoke("modify_resident", { resident });
+        setSnackbarMessageType("success");
         setSnackbarMessage("Resident modifié avec succès!");
       }
   
@@ -138,11 +160,13 @@ const Residents = () => {
       handleClose();
     } catch (error) {
       console.error("Failed to add or modify resident", error);
-      setSnackbarMessage(error.message || "Failed to add or modify resident.");
+      setSnackbarMessageType("error");
+      setSnackbarMessage(error.message || "Échec d'ajout ou de modification du résident.");
     } finally {
       setSnackbarOpen(true);
     }
   };
+  
 
   useEffect(() => {
     const fetchResidents = async () => {
@@ -222,7 +246,7 @@ const Residents = () => {
           </Button>
           <Button
             variant="contained"
-            color="secondary"
+            sx={{ bgcolor: '#f44336', color: '#fff', '&:hover': { bgcolor: '#d32f2f' } }}
             size="small"
             onClick={() => handleDeleteClick(params.row.cin)}
           >
@@ -469,6 +493,25 @@ const Residents = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Box m="20px">
+      {/* JSX content */}
+      <Dialog open={confirmationOpen} onClose={handleCancelDelete}>
+        <DialogContent>
+          <Box>
+            Êtes-vous sûr de vouloir supprimer le résident{" "}
+            <strong>{residentToDelete ? residentToDelete.nom_prenom : ""}</strong> ?
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete} color="primary">
+            Annuler
+          </Button>
+          <Button onClick={handleConfirmDelete} sx={{color: '#f44336', '&:hover': { color: '#d32f2f' } }}>
+            Supprimer
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
 
       <Snackbar
         open={snackbarOpen}
@@ -477,12 +520,12 @@ const Residents = () => {
       >
         <Alert
           onClose={() => setSnackbarOpen(false)}
-          severity={snackbarMessage.includes("Failed") ? "error" : "success"}
+          severity={snackbarMessageType} // Use the new state here
           sx={{ width: "100%" }}
         >
-          {snackbarMessage}
+          {snackbarMessage || "Success message"} {/* Provide a default success message */}
         </Alert>
-      </Snackbar>
+    </Snackbar>
     </Box>
   );
 };
