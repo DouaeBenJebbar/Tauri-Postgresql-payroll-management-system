@@ -153,6 +153,7 @@ const Residents = () => {
         setSnackbarMessageType("success");
         setSnackbarMessage("Resident modifié avec succès!");
       }
+      await invoke("generate_payments", { resident });
   
       const updatedResidents = await invoke("get_residents");
       setResidents(updatedResidents);
@@ -240,7 +241,7 @@ const Residents = () => {
             color="primary"
             size="small"
             onClick={() => handleEditClick(params.row.id_resident)}
-            style={{ marginRight: 8 }}
+            style={{ marginRight: 8, backgroundColor: colors.grey[500] }}
           >
             Modifier
           </Button>
@@ -300,9 +301,6 @@ const Residents = () => {
           },
           "& .MuiDataGrid-cell": {
             borderBottom: "none",
-          },
-          "& .name-column--cell": {
-            color: colors.greenAccent[300],
           },
           "& .MuiDataGrid-columnHeaders": {
             backgroundColor: colors.blueAccent[700],

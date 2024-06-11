@@ -144,10 +144,9 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
         <Box>
           <Button
             variant="contained"
-            color="primary"
             size="small"
             onClick={() => handleEditClick(params.row.specialite)}
-            style={{ marginRight: 8 }}
+            style={{ marginRight: 8, backgroundColor: colors.grey[500]  }}
           >
             Modifier
           </Button>

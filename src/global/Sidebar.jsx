@@ -64,10 +64,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
           padding: "5px 35px 5px 20px !important",
         },
         "& .pro-inner-item:hover": {
-          color: "#868dfb !important",
+          color: "#175e85 !important",
         },
         "& .pro-menu-item.custom-menu-item": {
-          backgroundColor: "#6870fa",
+          backgroundColor: "#0079ae",
           borderRadius: "5px",
           color: "#f0f0f0 !important",
         },
@@ -147,7 +147,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             />
             <Item
               title="Rappels"
-              //to="/calendar"
+              to="/rappels"
               icon={<CalendarTodayOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}

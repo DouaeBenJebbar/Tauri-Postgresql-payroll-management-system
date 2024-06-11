@@ -1,8 +1,12 @@
 use tauri::State;
 use sqlx::PgPool;
-use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident,Bank,Payment};
+use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident,Bank,Payment,RappelAnnuel};
 use thiserror::Error;
-use std::fmt;
+use chrono::{Local, NaiveDate};
+use bigdecimal::BigDecimal;
+use std::str::FromStr;
+
+
 
 //connecting to database
 
@@ -273,8 +277,8 @@ pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, S
             rib: record.rib.expect("rib is None"),
             nombre_enfants: record.nombre_enfants.expect("nombre_enfants is None"),
             id_bank: record.id_bank.expect("id_bank is None"),
-            specialty_name: record.specialty_name,
-            bank_name: Some(record.bank_name), // Wrap bank_name in Some
+            specialty_name: Some(record.specialty_name), // Corrected to match expected type Option<String>
+            bank_name: record.bank_name, // Already an Option<String>, no need to wrap in Some()
         })
         .collect();
 
@@ -355,6 +359,7 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
     .execute(pool)
     .await
     .map_err(|e| format!("Failed to modify resident: {}", e))?;
+    
 
     Ok(())
 }
@@ -362,16 +367,102 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
 
 //manage payments
 #[tauri::command]
-pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, MyError> {
-    let pool = pool.pool.lock().await;
-    let pool = pool.as_ref().ok_or_else(|| MyError {
-        message: "Database not connected".to_string(),
-    })?;
 
-    let payments = sqlx::query_as::<_, Payment>("SELECT id_payment, id_resident, date_from, date_to, amount, allocations_fam, worked_days FROM payment")
-        .fetch_all(pool)
-        .await
-        .map_err(MyError::from)?;
+pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, String> {
+    let pool_guard = pool.pool.lock().await;
+    let pool_ref = pool_guard.as_ref().ok_or("Database not connected")?;
+
+    let records = sqlx::query!(
+        r#"
+        SELECT 
+            payment.id_payment as "id_payment!",
+            payment.id_resident as "id_resident!",
+            payment.worked_days as "worked_days?",
+            payment.allocations_fam as "allocations_fam?",
+            payment.amount as "amount?",
+            payment.date_payment as "date_payment?",
+            residents.nom_prenom as "resident_name?"
+        FROM payment
+        LEFT JOIN residents ON payment.id_resident = residents.id_resident
+        "#
+    )
+    .fetch_all(pool_ref)
+    .await
+    .map_err(|e| format!("Failed to fetch payments: {}", e))?;
+
+    let payments: Vec<Payment> = records
+    .into_iter()
+    .map(|record| Payment {
+        id_payment: record.id_payment,
+        id_resident: record.id_resident,
+        worked_days: record.worked_days,
+        allocations_fam: record.allocations_fam.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
+        amount: record.amount.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
+        date_payment: record.date_payment,
+        resident_name: record.resident_name,
+    })
+    .collect();
 
     Ok(payments)
+}
+
+
+
+#[tauri::command]
+pub async fn generate_payments(pool: State<'_, AppState>) -> Result<(), String> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or("Database not connected")?;
+
+    // Use Local::now() instead of Local::today() and convert to NaiveDate
+    let current_date: NaiveDate = Local::now().naive_local().date();
+
+    sqlx::query!(
+        "SELECT generate_monthly_payments($1)",
+        current_date
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to generate payments: {}", e))?;
+
+    Ok(())
+}
+
+
+//manage rappels annuels
+
+#[tauri::command]
+pub async fn get_rappels(pool: State<'_, AppState>) -> Result<Vec<RappelAnnuel>, String> {
+    let pool_guard = pool.pool.lock().await;
+    let pool_ref = pool_guard.as_ref().ok_or("Database not connected")?;
+
+    let records = sqlx::query!(
+        r#"
+        SELECT 
+            rappel_annuel.id_rappel as "id_rappel!",
+            rappel_annuel.id_resident as "id_resident!",
+            rappel_annuel.exercice as "exercice?",
+            rappel_annuel.nombre_jours as "nombre_jours?",
+            rappel_annuel.montant as "montant?",
+            residents.nom_prenom as "resident_name?"
+        FROM rappel_annuel
+        LEFT JOIN residents ON rappel_annuel.id_resident = residents.id_resident
+        "#
+    )
+    .fetch_all(pool_ref)
+    .await
+    .map_err(|e| format!("Failed to fetch payments: {}", e))?;
+
+    let rappels: Vec<RappelAnnuel> = records
+    .into_iter()
+    .map(|record| RappelAnnuel {
+        id_rappel: record.id_rappel,
+        id_resident: Some(record.id_resident),
+        exercice: record.exercice,
+        nombre_jours: record.nombre_jours,
+        montant: record.montant.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
+        resident_name: record.resident_name,
+    })
+    .collect();
+
+    Ok(rappels)
 }

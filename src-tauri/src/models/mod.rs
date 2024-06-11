@@ -12,6 +12,7 @@ pub use specialty:: NewSpecialty;
 pub use resident:: NewResident;
 pub use specialty::Bank;
 pub use payments::Payment;
+pub use payments::RappelAnnuel;
 
 use serde::Serialize;
 use tokio::sync::Mutex;

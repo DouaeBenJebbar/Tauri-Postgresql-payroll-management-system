@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   useTheme,
-  Button,
   IconButton,
   InputBase,
   Snackbar,
@@ -11,12 +10,19 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Button,
+  Dialog, 
+  DialogContent, 
+  DialogActions,
 } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
 import { invoke } from "@tauri-apps/api/tauri";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import SearchIcon from "@mui/icons-material/Search";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
 
 const Payments = () => {
   const theme = useTheme();
@@ -24,86 +30,156 @@ const Payments = () => {
   const [payments, setPayments] = useState([]);
   const [searchInput, setSearchInput] = useState("");
   const [filteredPayments, setFilteredPayments] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
+  const [uniqueYears, setUniqueYears] = useState([]);
+  const [monthsForYear, setMonthsForYear] = useState([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-
+  const [hasPaymentsForMonth, setHasPaymentsForMonth] = useState(true);
   const months = [
     "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
     "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
   ];
-  const years = Array.from(new Array(20), (val, index) => 2000 + index);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDialogMonth, setConfirmDialogMonth] = useState("");
+  const [confirmDialogYear, setConfirmDialogYear] = useState("");
 
-  const handleAddClick = () => {
-    // Add logic for adding a payment
-  };
 
-  const handleEditClick = (id) => {
-    // Add logic for editing a payment
-  };
+  const currentYear = new Date().getFullYear();
+  const currentMonthIndex = new Date().getMonth();
+  const currentMonth = months[currentMonthIndex];
 
-  const handleDeleteClick = async (id) => {
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  const [reloadTrigger, setReloadTrigger] = useState(false); 
+
+  const handleGenerateClick = () => {
+    const worksheet = XLSX.utils.json_to_sheet(filteredPayments);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Payments");
+  
     try {
-      await invoke("delete_payment", { id });
-      const updatedPayments = await invoke("get_payments");
-      setPayments(updatedPayments);
-      setFilteredPayments(updatedPayments);
-      setSnackbarMessage("Paiement supprimé avec succès");
+      // Generate workbook output as a base64 string
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+      // Convert base64 string to blob
+      const blob = base64StringToBlob(wbout, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      // Use saveAs or a similar method to save the blob
+      saveAs(blob, "filename.xlsx");
+      setSnackbarMessage("Fichier Excel généré avec succès !");
       setSnackbarOpen(true);
     } catch (error) {
-      console.error("Échec de la suppression du paiement", error);
-      setSnackbarMessage("Échec de la suppression du paiement");
-      setSnackbarOpen(true);
+      console.error("Error generating file: ", error);
     }
-  };
+  
 
+  };
+  
+  // Utility function to convert a base64 string to a Blob
+  function base64StringToBlob(base64, mimeType) {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], {type: mimeType});
+  }
+  
   useEffect(() => {
     const fetchPayments = async () => {
       try {
         const data = await invoke("get_payments");
         setPayments(data);
         setFilteredPayments(data);
+        extractUniqueYears(data); // Extract unique years
       } catch (error) {
         console.error("Échec de la récupération des paiements", error);
       }
     };
     fetchPayments();
-  }, []);
+  }, [reloadTrigger]);
 
   useEffect(() => {
     let filtered = payments.filter((payment) =>
-      payment.resident.toLowerCase().includes(searchInput.toLowerCase())
+      payment.resident_name.toString().includes(searchInput)
     );
     if (selectedMonth) {
       filtered = filtered.filter(
-        (payment) => new Date(payment.date).getMonth() === months.indexOf(selectedMonth)
+        (payment) => new Date(payment.date_payment).getMonth() === months.indexOf(selectedMonth)
       );
     }
     if (selectedYear) {
       filtered = filtered.filter(
-        (payment) => new Date(payment.date).getFullYear() === parseInt(selectedYear, 10)
+        (payment) => new Date(payment.date_payment).getFullYear() === parseInt(selectedYear, 10)
       );
     }
     setFilteredPayments(filtered);
+    setHasPaymentsForMonth(filtered.length > 0);
   }, [searchInput, selectedMonth, selectedYear, payments]);
+
+  useEffect(() => {
+    if (selectedYear) {
+      const monthsWithPayments = [
+        ...new Set(
+          payments
+            .filter(payment => new Date(payment.date_payment).getFullYear() === parseInt(selectedYear))
+            .map(payment => months[new Date(payment.date_payment).getMonth()])
+        )
+      ];
+      if (!monthsWithPayments.includes(currentMonth)) {
+        monthsWithPayments.push(currentMonth);
+      }
+      setMonthsForYear(monthsWithPayments);
+    }
+  }, [selectedYear, payments, currentMonth]);
+
+  const extractUniqueYears = (payments) => {
+    const years = payments.map(payment => new Date(payment.date_payment).getFullYear());
+    const uniqueYears = [...new Set(years)];
+    setUniqueYears(uniqueYears);
+  };
+
+
 
   const calculateHeight = () => {
     const rowHeight = 52;
     const headerHeight = 56;
+    const footerHeight = 56;
     const numRows = filteredPayments.length;
-    const totalHeight = headerHeight + numRows * rowHeight;
+    const totalHeight = headerHeight + numRows * rowHeight + footerHeight;
     const maxHeight = 500;
     return totalHeight < maxHeight ? totalHeight : maxHeight;
   };
 
   const columns = [
-    { field: "resident", headerName: "Résident", flex: 1 },
-    { field: "salaire", headerName: "Salaire de base", flex: 1 },
-    { field: "jours_travailles", headerName: "Jours travaillés", flex: 1 },
+    { field: "resident_name", headerName: "Résident", flex: 1 },
+    { 
+      field: "date_payment", 
+      headerName: "Date de Paiement", 
+      flex: 1,
+    },
+    { field: "worked_days", headerName: "Jours travaillés", flex: 1 },
     { field: "allocations_fam", headerName: "Allocations familiales", flex: 1 },
-    { field: "Montant_total", headerName: "Montant total", flex: 1 },
+    {
+      field: "amount",
+      headerName: "Montant total",
+      flex: 1,
+      renderCell: (params) => {
+        // Convert params.value to a number before formatting
+        const value = parseFloat(params.value);
+        const formattedValue = !isNaN(value) ? value.toFixed(2) : "0.00";
+        return `${formattedValue} DH`;
+      },
+    },
   ];
+  
+
+  
+  const totalPayments = filteredPayments.reduce((acc, curr) => {
+    const amount = Number(curr.amount);
+    return acc + (isNaN(amount) ? 0 : amount);
+  }, 0);
+  
 
   return (
     <Box m="20px">
@@ -130,45 +206,43 @@ const Payments = () => {
         <FormControl sx={{ ml: 2, minWidth: 120 }}>
           <InputLabel>Mois</InputLabel>
           <Select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-          >
-            <MenuItem value="">
-              <em>Aucun</em>
-            </MenuItem>
-            {months.map((month, index) => (
-              <MenuItem key={index} value={month}>
-                {month}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl sx={{ ml: 2, minWidth: 120 }}>
-          <InputLabel>Année</InputLabel>
-          <Select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-          >
-            <MenuItem value="">
-              <em>Aucune</em>
-            </MenuItem>
-            {years.map((year, index) => (
-              <MenuItem key={index} value={year}>
-                {year}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Button
-          variant="contained"
-          color="secondary"
-          size="medium"
-          onClick={handleAddClick}
-          sx={{ ml: 2 }}
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
         >
-          Générer Ordre de Paie
-        </Button>
-      </Box>
+          {monthsForYear.map((month, index) => (
+            <MenuItem key={index} value={month}>
+              {month}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl sx={{ ml: 2, minWidth: 120 }}>
+        <InputLabel>Année</InputLabel>
+        <Select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(e.target.value)}
+        >
+          {uniqueYears.map((year, index) => (
+            <MenuItem key={index} value={year}>
+              {year}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Button
+        variant="contained"
+        color="secondary"
+        size="medium"
+        onClick={handleGenerateClick}
+        sx={{ ml: 2 }}
+        disabled={!hasPaymentsForMonth}
+      >
+        Générer Ordre de Virement
+      </Button>
+
+    </Box>
+
+    {hasPaymentsForMonth && (
       <Box
         m="40px 0 0 0"
         sx={{
@@ -202,28 +276,42 @@ const Payments = () => {
         <DataGrid
           rows={filteredPayments}
           columns={columns}
-          getRowId={(row) => row.id}
+          getRowId={(row) => row.id_payment}
           disableSelectionOnClick
           autoHeight
-          hideFooter
         />
-      </Box>
-
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={() => setSnackbarOpen(false)}
-      >
-        <Alert
-          onClose={() => setSnackbarOpen(false)}
-          severity={snackbarMessage.includes("Échec") ? "error" : "success"}
-          sx={{ width: "100%" }}
+        {/* Custom Footer */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            padding: "8px 24px",
+            backgroundColor: colors.grey[800], // Setting background color
+            fontWeight: "bold",
+          }}
         >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-    </Box>
-  );
+          Montant Total : {totalPayments.toFixed(2)} DH
+        </div>
+      </Box>
+    )}
+
+    <Snackbar
+      open={snackbarOpen}
+      autoHideDuration={6000}
+      onClose={() => setSnackbarOpen(false)}
+    >
+      <Alert
+        onClose={() => setSnackbarOpen(false)}
+        severity={snackbarMessage.includes("Échec") ? "error" : "success"}
+        sx={{ width: "100%" }}
+      >
+        {snackbarMessage}
+      </Alert>
+    </Snackbar>
+  </Box>
+);
 };
 
 export default Payments;
+

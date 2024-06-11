@@ -11,6 +11,8 @@ import DbForm from './scenes/dbForm';
 import LoginForm from './scenes/loginForm';
 import { invoke } from '@tauri-apps/api/tauri';
 import Payments from './scenes/payments';
+import Rappels from './scenes/rappel/Rappel';
+import Calendar from './scenes/calendar';
 
 function App() {
   const [theme, colorMode] = useMode();
@@ -49,6 +51,9 @@ function App() {
                     <Route path="/residents" element={<Residents />} />
                     <Route path="/specialties" element={<Specialties />} />
                     <Route path="/payments" element={<Payments />} />
+                    <Route path="/rappels" element={<Rappels />} />
+                    <Route path="/calendar" element={<Calendar />} />
+
                   </Routes>
                 </main>
               </div>

@@ -9,7 +9,8 @@ use tokio::sync::Mutex;
 mod commands;
 mod models;
 
-use commands::{connect_db, login,get_banks, get_specialties, add_specialty, delete_specialty, modify_specialty, get_residents, add_resident, delete_resident,modify_resident, get_payments};
+
+use commands::{connect_db, login,get_banks, get_specialties, add_specialty, delete_specialty, modify_specialty, get_residents, add_resident, delete_resident,modify_resident, get_payments, generate_payments,get_rappels};
 use models::AppState;
 
 fn main() {
@@ -29,7 +30,9 @@ fn main() {
             add_resident,
             delete_resident,
             modify_resident,
-            get_payments
+            get_payments,
+            generate_payments,
+            get_rappels
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
