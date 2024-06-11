@@ -1,6 +1,6 @@
 use tauri::State;
 use sqlx::PgPool;
-use crate::models::{AppState, DbConfig, Specialty,Resident ,MyError,NewSpecialty,NewResident,Bank,Payment,RappelAnnuel};
+use crate::models::{AppState, DbConfig, Specialite,Resident ,MyError,NewSpecialite,NewResident,Banque,PaiementMensuel,RappelAnnuel};
 use thiserror::Error;
 use chrono::{Local, NaiveDate};
 use bigdecimal::BigDecimal;
@@ -19,21 +19,28 @@ pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<
 
     match PgPool::connect(&connection_str).await {
         Ok(pool) => {
+            // Replace the existing pool with the new one
             *state.pool.lock().await = Some(pool);
             Ok(())
         }
         Err(e) => Err(format!("Failed to connect to the database: {}", e)),
     }
 }
+
+pub async fn disconnect_db(state: State<'_, AppState>) {
+    // Set the pool to None to release the resources
+    *state.pool.lock().await = None;
+}
+
 //managing banks
 #[tauri::command]
-pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Bank>, MyError> {
+pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Banque>, MyError> {
     let pool = state.pool.lock().await;
     let pool = pool.as_ref().ok_or_else(|| MyError {
         message: "Database not connected".to_string(),
     })?;
     
-    let banks = sqlx::query_as::<_, Bank>("SELECT id, bank_name FROM bank")
+    let banks = sqlx::query_as::<_, Banque>("SELECT id_banque, nom FROM banque")
         .fetch_all(pool)
         .await
         .map_err(MyError::from)?;
@@ -44,13 +51,13 @@ pub async fn get_banks(state: State<'_, AppState>) -> Result<Vec<Bank>, MyError>
 //managing specialties
 
 #[tauri::command]
-pub async fn get_specialties(state: State<'_, AppState>) -> Result<Vec<Specialty>, MyError> {
+pub async fn get_specialties(state: State<'_, AppState>) -> Result<Vec<Specialite>, MyError> {
     let pool = state.pool.lock().await;
     let pool = pool.as_ref().ok_or_else(|| MyError {
         message: "Database not connected".to_string(),
     })?;
     
-    let specialties = sqlx::query_as::<_, Specialty>("SELECT id, name, yearsofresidency FROM specialty")
+    let specialties = sqlx::query_as::<_, Specialite>("SELECT id_specialite, nom, nombre_annees FROM specialites")
         .fetch_all(pool)
         .await
         .map_err(MyError::from)?;
@@ -59,14 +66,15 @@ pub async fn get_specialties(state: State<'_, AppState>) -> Result<Vec<Specialty
 }
 
 
+/*
 #[tauri::command]
-pub async fn add_specialty(pool: State<'_, AppState>, specialty: NewSpecialty) -> Result<(), String> {
+pub async fn add_specialty(pool: State<'_, AppState>, specialite: NewSpecialite) -> Result<(), String> {
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
   
     let existing_specialty = sqlx::query!(
-      "SELECT COUNT(*) FROM specialty WHERE name = $1",
-      specialty.specialite
+      "SELECT COUNT(*) FROM specialites WHERE nom = $1",
+      specialite.nom
     )
     .fetch_one(pool)
     .await
@@ -79,24 +87,23 @@ pub async fn add_specialty(pool: State<'_, AppState>, specialty: NewSpecialty) -
     }
   
     sqlx::query!(
-      "INSERT INTO specialty (name, yearsofresidency) VALUES ($1, $2)",
-      specialty.specialite,
-      specialty.nombre_annees
+      "INSERT INTO specialites (nom, nombre_annees) VALUES ($1, $2)",
+      specialite.nom,
+      specialite.nombre_annees
     )
     .execute(pool)
     .await
     .map_err(|e| format!("Failed to add specialty: {}", e))?;
   
     Ok(())
-  }
-
+}
 
 #[tauri::command]
-pub async fn delete_specialty(pool: State<'_, AppState>, specialty_name: String) -> Result<(), String> {
+pub async fn delete_specialty(pool: State<'_, AppState>, nom_specialite: String) -> Result<(), String> {
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
 
-    sqlx::query!("DELETE FROM specialty WHERE name = $1", specialty_name)
+    sqlx::query!("DELETE FROM specialite WHERE nom = $1", nom_specialite)
         .execute(pool)
         .await
         .map_err(|e| format!("Failed to delete specialty: {}", e))?;
@@ -104,17 +111,15 @@ pub async fn delete_specialty(pool: State<'_, AppState>, specialty_name: String)
     Ok(())
 }
 
-
-
 #[tauri::command]
-pub async fn modify_specialty(pool: State<'_, AppState>, specialty: Specialty) -> Result<(), String> {
+pub async fn modify_specialty(pool: State<'_, AppState>, specialite: Specialite) -> Result<(), String> {
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
 
     let existing_specialty = sqlx::query!(
-        "SELECT COUNT(*) FROM specialty WHERE name = $1 AND id != $2",
-        specialty.specialite,
-        specialty.id
+        "SELECT COUNT(*) FROM specialite WHERE nom = $1 AND id_specialite != $2",
+        specialite.nom,
+        specialite.id_specialite
     )
     .fetch_one(pool)
     .await
@@ -127,10 +132,10 @@ pub async fn modify_specialty(pool: State<'_, AppState>, specialty: Specialty) -
     }
 
     sqlx::query!(
-        "UPDATE specialty SET name = $1, yearsofresidency = $2 WHERE id = $3",
-        specialty.specialite,
-        specialty.nombre_annees,
-        specialty.id
+        "UPDATE specialite SET nom = $1, nombre_annees = $2 WHERE id_specialite = $3",
+        specialite.nom,
+        specialite.nombre_annees,
+        specialite.id_specialite
     )
     .execute(pool)
     .await
@@ -366,8 +371,8 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
 
 
 //manage payments
-#[tauri::command]
 
+#[tauri::command]
 pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, String> {
     let pool_guard = pool.pool.lock().await;
     let pool_ref = pool_guard.as_ref().ok_or("Database not connected")?;
@@ -381,9 +386,12 @@ pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, Str
             payment.allocations_fam as "allocations_fam?",
             payment.amount as "amount?",
             payment.date_payment as "date_payment?",
-            residents.nom_prenom as "resident_name?"
+            residents.nom_prenom as "resident_name?",
+            residents.rib as "rib?",
+            bank.bank_name as "bank_name?"
         FROM payment
         LEFT JOIN residents ON payment.id_resident = residents.id_resident
+        LEFT JOIN bank ON residents.id_bank = bank.id
         "#
     )
     .fetch_all(pool_ref)
@@ -400,11 +408,14 @@ pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, Str
         amount: record.amount.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
         date_payment: record.date_payment,
         resident_name: record.resident_name,
+        rib: record.rib,
+        bank_name: record.bank_name,
     })
     .collect();
 
     Ok(payments)
 }
+
 
 
 
@@ -466,3 +477,4 @@ pub async fn get_rappels(pool: State<'_, AppState>) -> Result<Vec<RappelAnnuel>,
 
     Ok(rappels)
 }
+    */

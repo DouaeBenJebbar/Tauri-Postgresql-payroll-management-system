@@ -8,24 +8,23 @@ pub struct Resident {
     pub cin: String,
     pub nom_prenom: Option<String>,
     pub date_debut: NaiveDate,
-    pub id_specialty: i32,
-    pub id_bank: i32,
+    pub id_specialite: i32,
     pub date_fin: Option<NaiveDate>, 
-    pub is_titulaire: Option<bool>, 
     pub rib: i32, 
+    pub id_banque: i32,
     pub nombre_enfants: i32, 
-    pub specialty_name: Option<String>,
-    pub bank_name: Option<String>,
+    pub nom_specialite: Option<String>,
+    pub nom_banque: Option<String>,
 }
+
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct NewResident {
     pub cin: String,
     pub nom_prenom: String,
     pub date_debut: NaiveDate,
-    pub id_specialty: i32,
-    pub id_bank: i32,
-    pub is_titulaire: bool,
+    pub id_specialite: i32,
     pub rib: i32,
+    pub id_banque: i32,
     pub nombre_enfants: i32,
 }

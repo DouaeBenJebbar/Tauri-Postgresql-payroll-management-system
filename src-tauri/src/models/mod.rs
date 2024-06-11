@@ -6,12 +6,12 @@ pub mod payments;
 
 pub use db_config::DbConfig;
 pub use login_payload::LoginPayload;
-pub use specialty::Specialty;
+pub use specialty::Specialite;
 pub use resident::Resident;
-pub use specialty:: NewSpecialty;
+pub use specialty:: NewSpecialite;
 pub use resident:: NewResident;
-pub use specialty::Bank;
-pub use payments::Payment;
+pub use specialty::Banque;
+pub use payments::PaiementMensuel;
 pub use payments::RappelAnnuel;
 
 use serde::Serialize;

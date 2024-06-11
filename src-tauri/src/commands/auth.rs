@@ -8,7 +8,7 @@ pub async fn login(payload: LoginPayload, state: State<'_, AppState>) -> Result<
     let pool = state.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
     
-    match sqlx::query("SELECT password FROM admins WHERE username = $1")
+    match sqlx::query("SELECT password FROM admin WHERE username = $1")
         .bind(&payload.username)
         .fetch_one(pool)
         .await

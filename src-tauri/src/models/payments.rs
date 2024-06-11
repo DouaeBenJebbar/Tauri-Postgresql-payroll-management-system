@@ -5,25 +5,28 @@ use serde::{Serialize, Deserialize};// Import the SqlxBigDecimal alias
 use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct Payment {
-    pub id_payment: i32,
+pub struct PaiementMensuel {
+    pub id_paiement: i32,
     pub id_resident: i32,
-    pub worked_days: Option<i32>,
-    pub allocations_fam: Option<BigDecimal>,
-    pub amount: Option<BigDecimal>,
-    pub date_payment: Option<NaiveDate>,
-    pub resident_name: Option<String>,
+    pub jours_travail: i32,
+    pub allocations_familiales: Option<BigDecimal>,
+    pub montant: BigDecimal,
+    pub date_paiement: NaiveDate,
+    pub nom_resident: Option<String>,
+    pub rib: Option<i32>,
+    pub nom_banque: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize,FromRow)]
 pub struct RappelAnnuel{
     pub id_rappel: i32,
-    pub id_resident: Option<i32>,
-    pub exercice: Option<i32>,
-    pub nombre_jours: Option<i32>,
-    pub montant: Option<BigDecimal>,
-    pub resident_name: Option<String>,
+    pub id_resident: i32,
+    pub exercice: i32,
+    pub duree_rappel: i32,
+    pub montant: BigDecimal,
+    pub nom_resident: Option<String>,
 }
+
 
 /*
 #[derive(Insertable, Serialize, Deserialize)]

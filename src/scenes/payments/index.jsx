@@ -53,37 +53,82 @@ const Payments = () => {
 
   const [reloadTrigger, setReloadTrigger] = useState(false); 
 
-  const handleGenerateClick = () => {
-    const worksheet = XLSX.utils.json_to_sheet(filteredPayments);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Payments");
-  
-    try {
-      // Generate workbook output as a base64 string
-      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-      // Convert base64 string to blob
-      const blob = base64StringToBlob(wbout, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      // Use saveAs or a similar method to save the blob
-      saveAs(blob, "filename.xlsx");
-      setSnackbarMessage("Fichier Excel généré avec succès !");
-      setSnackbarOpen(true);
-    } catch (error) {
-      console.error("Error generating file: ", error);
-    }
-  
 
-  };
-  
-  // Utility function to convert a base64 string to a Blob
-  function base64StringToBlob(base64, mimeType) {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
+const handleGenerateClick = async () => {
+  try {
+    // Load the Excel template file
+    const response = await fetch('/templates/ovTemplate.xlsx');
+    if (!response.ok) {
+      throw new Error('Failed to fetch template file');
     }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], {type: mimeType});
+
+    const templateArrayBuffer = await response.arrayBuffer();
+    const templateWorkbook = XLSX.read(templateArrayBuffer, { type: 'array' });
+
+    const templateWorksheetName = templateWorkbook.SheetNames[0];
+    const templateWorksheet = templateWorkbook.Sheets[templateWorksheetName];
+
+    // Find the last row with data in the template to avoid overwriting existing data
+    const range = XLSX.utils.decode_range(templateWorksheet['!ref']);
+    const lastRow = range.e.r + 1;
+
+    // Convert filteredPayments data to the format expected by the template
+    const excelData = filteredPayments.map(payment => [
+      payment.resident_name,
+      payment.rib,
+      payment.bank_name,
+      payment.amount,
+    ]);
+
+    // Add the new data starting from the appropriate row
+    XLSX.utils.sheet_add_aoa(templateWorksheet, excelData, { origin: `A${lastRow + 1}` });
+
+    // Calculate the total of all payments
+    const totalPayments = filteredPayments.reduce((acc, curr) => acc + parseFloat(curr.amount), 0).toFixed(2);
+
+    // Append the total to the total row in the worksheet
+    const totalRow = `A${lastRow + 1 + filteredPayments.length}`;
+    XLSX.utils.sheet_add_aoa(templateWorksheet, [['Total', '', '', totalPayments]], { origin: totalRow });
+
+    // Add the updated worksheet to a new workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, templateWorksheet, 'Payments');
+
+    // Write the workbook to a binary string
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+
+    // Convert binary string to blob
+    const buffer = new ArrayBuffer(wbout.length);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < wbout.length; ++i) {
+      view[i] = wbout.charCodeAt(i) & 0xFF;
+    }
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+
+    // Use saveAs or a similar method to save the blob
+    saveAs(blob, 'filename.xlsx');
+
+    setSnackbarMessage('Fichier Excel généré avec succès !');
+    setSnackbarOpen(true);
+  } catch (error) {
+    console.error('Error generating file: ', error);
+    setSnackbarMessage('Échec de la génération du fichier Excel.');
+    setSnackbarOpen(true);
   }
+};
+
+// Utility function to convert a base64 string to a Blob
+function base64StringToBlob(base64, mimeType) {
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+}
+
+  
   
   useEffect(() => {
     const fetchPayments = async () => {
