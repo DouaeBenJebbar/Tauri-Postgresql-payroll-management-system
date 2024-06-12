@@ -24,7 +24,6 @@ pub struct RappelAnnuel{
     pub exercice: i32,
     pub duree_rappel: i32,
     pub montant: BigDecimal,
-    pub nom_resident: Option<String>,
 }
 
 

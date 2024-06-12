@@ -198,7 +198,7 @@ const Rappels = () => {
 
   return (
     <Box m="20px">
-      <Header title="Rappels" />
+      <Header title="RAPPELS" />
       <Box display="flex" alignItems="center" marginTop={5} p={1}>
         <Box
           display="flex"

@@ -228,7 +228,7 @@ function base64StringToBlob(base64, mimeType) {
 
   return (
     <Box m="20px">
-      <Header title="Paiements" />
+      <Header title="PAIEMENTS" />
       <Box display="flex" alignItems="center" marginTop={5} p={1}>
         <Box
           display="flex"

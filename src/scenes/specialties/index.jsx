@@ -1,3 +1,4 @@
+// frontend
 import React, { useEffect, useState } from "react";
 import { Box, useTheme, Button, IconButton, InputBase, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Snackbar, Alert } from "@mui/material";
 import { DataGrid } from "@mui/x-data-grid";
@@ -13,15 +14,13 @@ const Specialties = () => {
   const [searchInput, setSearchInput] = useState("");
   const [filteredSpecialties, setFilteredSpecialties] = useState([]);
   const [open, setOpen] = useState(false);
-  const [newSpecialty, setNewSpecialty] = useState({ specialite: "", nombre_annees: "" });
+  const [newSpecialty, setNewSpecialty] = useState({ nom: "", nombre_annees: "" });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarMessageType, setSnackbarMessageType] = useState("success"); 
   const [formMode, setFormMode] = useState("add"); 
   const [specialtyToDelete, setSpecialtyToDelete] = useState(null);
-const [confirmationOpen, setConfirmationOpen] = useState(false);
-
-
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
 
   const handleAddClick = () => {
     setFormMode("add");
@@ -29,21 +28,20 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
   };
   
   const handleEditClick = (id) => {
-    const specialty = specialties.find((specialty) => specialty.specialite === id);
+    const specialty = specialties.find((specialty) => specialty.id_specialite === id);
     setNewSpecialty(specialty);
     setFormMode("edit");
     setOpen(true);
   };
 
-  const handleDeleteClick = (specialite) => {
-    setSpecialtyToDelete(specialite);
+  const handleDeleteClick = (id) => {
+    setSpecialtyToDelete(id);
     setConfirmationOpen(true);
   };
   
-
   const handleConfirmDelete = async () => {
     try {
-      await invoke("delete_specialty", { specialtyName: specialtyToDelete });
+      await invoke("delete_specialty", { id_specialite: specialtyToDelete });
       const updatedSpecialties = await invoke("get_specialties");
       setSpecialties(updatedSpecialties);
       setFilteredSpecialties(updatedSpecialties);
@@ -62,21 +60,21 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
   
   const handleClose = () => {
     setOpen(false);
-    setNewSpecialty({ specialite: "", nombre_annees: "" });
+    setNewSpecialty({ nom: "", nombre_annees: "" });
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewSpecialty((prev) => ({
       ...prev,
-      [name]: name === "nombre_annees" ? value : value.trim(), // Ensure it's a string
+      [name]: name === "nombre_annees" ? parseInt(value) : value,
     }));
   };
   
   const handleFormSubmit = async () => {
     try {
       // Validate form fields
-      if (!newSpecialty.specialite || !newSpecialty.nombre_annees) {
+      if (!newSpecialty.nom || !newSpecialty.nombre_annees) {
         setSnackbarMessageType("error");
         throw new Error("Veuillez remplir tous les champs.");
       }
@@ -88,24 +86,12 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
   
       if (formMode === "add") {
         // Perform specialty addition
-        const specialtyToSubmit = {
-          specialite: newSpecialty.specialite,
-          nombre_annees: duration,
-        };
-  
-        await invoke("add_specialty", { specialty: specialtyToSubmit });
-  
+        await invoke("add_specialty", { specialty: newSpecialty });
         setSnackbarMessageType("success");
         setSnackbarMessage("Spécialité ajoutée avec succès!");
       } else if (formMode === "edit") {
         // Perform specialty modification
-        const specialtyToSubmit = {
-          ...newSpecialty,
-          nombre_annees: duration,
-        };
-  
-        await invoke("modify_specialty", { specialty: specialtyToSubmit });
-  
+        await invoke("modify_specialty", { specialty: newSpecialty });
         setSnackbarMessageType("success");
         setSnackbarMessage("Spécialité modifiée avec succès!");
       }
@@ -126,7 +112,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
   
   const columns = [
     {
-      field: "specialite",
+      field: "nom",
       headerName: "Spécialité médicale",
       flex: 1,
       cellClassName: "name-column--cell",
@@ -145,7 +131,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
           <Button
             variant="contained"
             size="small"
-            onClick={() => handleEditClick(params.row.specialite)}
+            onClick={() => handleEditClick(params.row.id_specialite)}
             style={{ marginRight: 8, backgroundColor: colors.grey[500]  }}
           >
             Modifier
@@ -154,7 +140,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
             variant="contained"
             sx={{ bgcolor: '#f44336', color: '#fff', '&:hover': { bgcolor: '#d32f2f' } }}
             size="small"
-            onClick={() => handleDeleteClick(params.row.specialite)}
+            onClick={() => handleDeleteClick(params.row.id_specialite)}
           >
             Supprimer
           </Button>
@@ -181,7 +167,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
   useEffect(() => {
     setFilteredSpecialties(
       specialties.filter((specialty) =>
-        specialty.specialite.toLowerCase().includes(searchInput.toLowerCase())
+        specialty.nom.toLowerCase().includes(searchInput.toLowerCase())
       )
     );
   }, [searchInput, specialties]);
@@ -197,7 +183,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
 
   return (
     <Box m="20px">
-      <Header title="Spécialités" />
+      <Header title="SPÉCIALITÉS" />
       <Box
         display="flex"
         alignItems="center"
@@ -245,7 +231,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
             borderBottom: "none",
           },
           "& .name-column--cell": {
-            color: colors.greenAccent[300],
+            color: colors.black,
           },
           "& .MuiDataGrid-columnHeaders": {
             backgroundColor: colors.blueAccent[700],
@@ -266,21 +252,21 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
           rows={filteredSpecialties}
           columns={columns}
           pagination={true}
-          getRowId={(row) => row.specialite}
+          getRowId={(row) => row.id_specialite}
         />
       </Box>
 
       <Dialog open={open} onClose={handleClose}>
-        <DialogTitle>Ajouter Spécialité</DialogTitle>
+        <DialogTitle>{formMode === "add" ? "Ajouter Spécialité" : "Modifier Spécialité"}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            name="specialite"
+            name="nom"
             label="Spécialité médicale"
             type="text"
             fullWidth
-            value={newSpecialty.specialite}
+            value={newSpecialty.nom}
             onChange={handleInputChange}
           />
           <TextField
@@ -306,7 +292,7 @@ const [confirmationOpen, setConfirmationOpen] = useState(false);
         <DialogTitle>Confirmation de suppression</DialogTitle>
         <DialogContent>
           <Box fontWeight="bold">
-            Êtes-vous sûr de vouloir supprimer la spécialité "{specialtyToDelete}" ?
+            Êtes-vous sûr de vouloir supprimer la spécialité sélectionnée?
           </Box>
         </DialogContent>
         <DialogActions>

@@ -25,7 +25,6 @@ const Residents = () => {
     nom_prenom: "",
     date_debut: "",
     id_specialty: "",
-    is_titulaire: false,
     rib: "",
     nombre_enfants: 0,
     id_bank: "",
@@ -51,7 +50,6 @@ const Residents = () => {
         nom_prenom: resident.nom_prenom,
         date_debut: resident.date_debut,
         id_specialty: resident.id_specialty,
-        is_titulaire: resident.is_titulaire,
         rib: resident.rib,
         nombre_enfants: resident.nombre_enfants,
         id_bank: resident.id_bank,
@@ -102,7 +100,6 @@ const Residents = () => {
       nom_prenom: "",
       date_debut: "",
       id_specialty: "",
-      is_titulaire: false,
       rib: "",
       nombre_enfants: 0,
       id_bank: "",
@@ -227,7 +224,6 @@ const Residents = () => {
     { field: "date_debut", headerName: "Date de Début", width: 150 },
     { field: "date_fin", headerName: "Date de Fin", width: 150 },
     {field: "specialty_name", headerName: "Spécialité", width: 150},
-    { field: "is_titulaire", headerName: "Titulaire", width: 100, type: "boolean" },
     { field: "rib", headerName: "RIB", width: 200 },
     { field: "nombre_enfants", headerName: "Nombre d'enfants", width: 150, type: "number" },
     {
@@ -260,7 +256,7 @@ const Residents = () => {
 
   return (
     <Box m="20px">
-      <Header title="Résidents" />
+      <Header title="RÉSIDENTS" />
       <Box display="flex" alignItems="center" marginTop={5} p={1}>
         <Box
           display="flex"
@@ -407,18 +403,6 @@ const Residents = () => {
             )}
           </TextField>
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={newResident.is_titulaire}
-                onChange={handleInputChange}
-                name="is_titulaire"
-                id="is_titulaire"
-                autoComplete="off"
-              />
-            }
-            label="Titulaire"
-          />
           <TextField
             margin="dense"
             id="rib"

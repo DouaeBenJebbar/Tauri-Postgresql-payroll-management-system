@@ -17,15 +17,22 @@ pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<
         config.user, config.password, config.host, config.port, config.database
     );
 
+    println!("Attempting to connect to: {}", connection_str);  // Debugging line
+
     match PgPool::connect(&connection_str).await {
         Ok(pool) => {
             // Replace the existing pool with the new one
             *state.pool.lock().await = Some(pool);
+            println!("Successfully connected to the database.");  // Debugging line
             Ok(())
         }
-        Err(e) => Err(format!("Failed to connect to the database: {}", e)),
+        Err(e) => {
+            println!("Failed to connect to the database: {}", e);  // Debugging line
+            Err(format!("Failed to connect to the database: {}", e))
+        }
     }
 }
+
 
 pub async fn disconnect_db(state: State<'_, AppState>) {
     // Set the pool to None to release the resources
@@ -64,39 +71,212 @@ pub async fn get_specialties(state: State<'_, AppState>) -> Result<Vec<Specialit
 
     Ok(specialties)
 }
-
-
 /*
 #[tauri::command]
-pub async fn add_specialty(pool: State<'_, AppState>, specialite: NewSpecialite) -> Result<(), String> {
+pub async fn add_specialite(pool: State<'_, AppState>, specialite: NewSpecialite) -> Result<(), String> {
     let pool = pool.pool.lock().await;
-    let pool = pool.as_ref().ok_or("Database not connected")?;
-  
+    let pool = pool.as_ref().ok_or_else(|| MyError {
+        message: "Database not connected".to_string(),
+    })?;
+
     let existing_specialty = sqlx::query!(
-      "SELECT COUNT(*) FROM specialites WHERE nom = $1",
-      specialite.nom
+        "SELECT COUNT(*) FROM 'specialites' WHERE nom = $1",
+        specialite.nom
     )
     .fetch_one(pool)
     .await
     .map_err(|e| format!("Failed to query database: {}", e))?;
-  
+
     if let Some(count) = existing_specialty.count {
-      if count > 0 {
-        return Err("Specialty name already exists".to_string());
-      }
+        if count > 0 {
+            return Err("Specialty name already exists".to_string());
+        }
     }
-  
+
     sqlx::query!(
-      "INSERT INTO specialites (nom, nombre_annees) VALUES ($1, $2)",
-      specialite.nom,
-      specialite.nombre_annees
+        "INSERT INTO specialites (nom, nombre_annees) VALUES ($1, $2)",
+        specialite.nom,
+        specialite.nombre_annees
     )
     .execute(pool)
     .await
     .map_err(|e| format!("Failed to add specialty: {}", e))?;
-  
+
     Ok(())
 }
+
+pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, String> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or("Database not connected")?;
+
+    // Fetch records with the correct type annotations
+    let records = sqlx::query!(
+        r#"
+        SELECT 
+            residents.id_resident as "id_resident",
+            residents.cin as "cin",
+            residents.nom_prenom as "nom_prenom",
+            residents.date_debut as "date_debut",
+            residents.id_specialite as "id_specialite",
+            residents.date_fin as "date_fin",
+            residents.rib as "rib",
+            residents.nombre_enfants as "nombre_enfants",
+            residents.id_banque as "id_banque",
+            specialites.nom as "nom_specialite",
+            banque.nom as "nom_banque"
+        FROM residents
+
+        "#
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to fetch residents: {}", e))?;
+
+    let residents: Vec<Resident> = records
+        .into_iter()
+        .map(|record| Resident {
+            id_resident: record.id_resident.expect("id_resident is None"),
+            cin: record.cin.expect("cin is None"),
+            nom_prenom: record.nom_prenom,
+            date_debut: record.date_debut.expect("date_debut is None"),
+            id_specialite: record.id_specialite.expect("id_specialty is None"),
+            date_fin: record.date_fin,
+            rib: record.rib.expect("rib is None"),
+            nombre_enfants: record.nombre_enfants.expect("nombre_enfants is None"),
+            id_banque: record.id_banque.expect("id_bank is None"),
+
+        })
+        .collect();
+
+    Ok(residents)
+}
+#[tauri::command]
+pub async fn add_specialite(pool: State<'_, AppState>, specialite: NewSpecialite) -> Result<(), String> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or_else(|| MyError {
+        message: "Database not connected".to_string(),
+    })?;
+
+    let existing_specialty = sqlx::query!(
+        "SELECT COUNT(*) FROM specialites WHERE nom = $1",
+        specialite.nom
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Failed to query database: {}", e))?;
+
+    if let Some(count) = existing_specialty.count {
+        if count > 0 {
+            return Err("Specialty name already exists".to_string());
+        }
+    }
+
+    sqlx::query!(
+        "INSERT INTO specialites (nom, nombre_annees) VALUES ($1, $2)",
+        specialite.nom,
+        specialite.nombre_annees
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to add specialty: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_specialite(pool: State<'_, AppState>, id_specialite: i32) -> Result<(), String> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or("Database not connected")?;
+
+    sqlx::query!("DELETE FROM specialites WHERE id_specialite = $1", id_specialite)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to delete specialty: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn modify_specialite(pool: State<'_, AppState>, specialite: Specialite) -> Result<(), String> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or("Database not connected")?;
+
+    let existing_specialty = sqlx::query!(
+        "SELECT COUNT(*) FROM specialites WHERE nom = $1 AND id_specialite != $2",
+        specialite.nom,
+        specialite.id_specialite
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| format!("Failed to query database: {}", e))?;
+
+    if let Some(count) = existing_specialty.count {
+        if count > 0 {
+            return Err("Specialty name already exists".to_string());
+        }
+    }
+
+    sqlx::query!(
+        "UPDATE specialites SET nom = $1, nombre_annees = $2 WHERE id_specialite = $3",
+        specialite.nom,
+        specialite.nombre_annees,
+        specialite.id_specialite
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to modify specialty: {}", e))?;
+
+    Ok(())
+}
+
+
+
+//manage payments
+
+#[tauri::command]
+pub async fn get_paiments(pool: State<'_, AppState>) -> Result<Vec<PaiementMensuel>, String> {
+    let pool_guard = pool.pool.lock().await;
+    let pool_ref = pool_guard.as_ref().ok_or("Database not connected")?;
+
+    let records = sqlx::query!(
+        r#"
+        SELECT 
+            paiement_mensuel.id_paiement as "id_payment!",
+            paiement_mensuel.id_resident as "id_resident!",
+            paiement_mensuel.jours_travail as "jours_travail?",
+            paiement_mensuel.allocations_familiales as "allocations_familiales?",
+            paiement_mensuel.montant as "montant?",
+            paiement_mensuel.date_paiement as "date_paiement?",
+            residents.nom_prenom as "resident_name?",
+            residents.rib as "rib?",
+            banque.nom as "nom_banque?"
+        FROM paiment_mensuel
+        LEFT JOIN residents ON paiement_mensuel.id_resident = residents.id_resident
+        LEFT JOIN banque ON residents.id_banque = banque.id_banque
+        "#
+    )
+    .fetch_all(pool_ref)
+    .await
+    .map_err(|e| format!("Failed to fetch payments: {}", e))?;
+
+    let payments: Vec<PaiementMensuel> = records
+    .into_iter()
+    .map(|record| PaiementMensuel {
+        id_paiement: record.id_paiement,
+        id_resident: record.id_resident,
+        jours_travail: record.jours_travail,
+        allocations_familiales: record.allocations_familiales.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
+        montant: record.montant.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
+        date_paiement: record.date_paiement,
+        nom_resident: record.nom_resident,
+        rib: record.rib,
+        nom_banque: record.nom_banque,
+    })
+    .collect();
+
+    Ok(payments)
+}
+
 
 #[tauri::command]
 pub async fn delete_specialty(pool: State<'_, AppState>, nom_specialite: String) -> Result<(), String> {
@@ -370,51 +550,6 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
 }
 
 
-//manage payments
-
-#[tauri::command]
-pub async fn get_payments(pool: State<'_, AppState>) -> Result<Vec<Payment>, String> {
-    let pool_guard = pool.pool.lock().await;
-    let pool_ref = pool_guard.as_ref().ok_or("Database not connected")?;
-
-    let records = sqlx::query!(
-        r#"
-        SELECT 
-            payment.id_payment as "id_payment!",
-            payment.id_resident as "id_resident!",
-            payment.worked_days as "worked_days?",
-            payment.allocations_fam as "allocations_fam?",
-            payment.amount as "amount?",
-            payment.date_payment as "date_payment?",
-            residents.nom_prenom as "resident_name?",
-            residents.rib as "rib?",
-            bank.bank_name as "bank_name?"
-        FROM payment
-        LEFT JOIN residents ON payment.id_resident = residents.id_resident
-        LEFT JOIN bank ON residents.id_bank = bank.id
-        "#
-    )
-    .fetch_all(pool_ref)
-    .await
-    .map_err(|e| format!("Failed to fetch payments: {}", e))?;
-
-    let payments: Vec<Payment> = records
-    .into_iter()
-    .map(|record| Payment {
-        id_payment: record.id_payment,
-        id_resident: record.id_resident,
-        worked_days: record.worked_days,
-        allocations_fam: record.allocations_fam.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
-        amount: record.amount.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")),
-        date_payment: record.date_payment,
-        resident_name: record.resident_name,
-        rib: record.rib,
-        bank_name: record.bank_name,
-    })
-    .collect();
-
-    Ok(payments)
-}
 
 
 
