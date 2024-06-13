@@ -15,6 +15,8 @@ pub use payments::PaiementMensuel;
 pub use payments::RappelAnnuel;
 
 use serde::Serialize;
+use sqlx::postgres::PgPool;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize)]
@@ -31,5 +33,5 @@ impl From<sqlx::Error> for MyError {
 }
 
 pub struct AppState {
-    pub pool: Mutex<Option<sqlx::PgPool>>,
+    pub pool: Arc<Mutex<Option<PgPool>>>,
 }

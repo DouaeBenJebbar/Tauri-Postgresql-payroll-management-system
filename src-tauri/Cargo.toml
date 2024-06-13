@@ -14,7 +14,7 @@ tauri-build = { version = "1", features = [] }
 tauri = { version = "1.0", features = [ "dialog-confirm", "shell-open", "dialog-save", "dialog-message", "dialog-open"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
-sqlx = { version = "0.6", features = ["postgres", "runtime-tokio-rustls", "chrono", "bigdecimal"] }
+sqlx = { version = "0.6.2", features = ["postgres", "runtime-tokio-rustls", "chrono", "bigdecimal"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
 bigdecimal = { version = "0.3", features = ["serde"] }

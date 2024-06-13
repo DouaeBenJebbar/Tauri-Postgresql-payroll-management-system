@@ -5,6 +5,8 @@
 
 
 use tokio::sync::Mutex;
+use std::sync::Arc;
+use tauri::generate_handler;
 
 mod commands;
 mod models;
@@ -12,41 +14,32 @@ mod models;
 
 use commands::{
     connect_db, 
-    login,get_banks, 
-    get_specialties, 
-    /*add_specialty, 
-    delete_specialty, 
-    modify_specialty, 
-    get_residents, 
-    add_resident, 
-    delete_resident,
-    modify_resident, 
-    get_payments, 
-    generate_payments,
-    get_rappels*/};
+    login,
+    get_banques,
+    get_specialites,
+    add_specialite,
+    get_residents
+};
+    
 use models::AppState;
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let state = AppState {
+        pool: Arc::new(Mutex::new(None)),
+    };
+
     tauri::Builder::default()
-        .manage(AppState {
-            pool: Mutex::new(None),
-        })
-        .invoke_handler(tauri::generate_handler![
+        .manage(state)
+        .invoke_handler(generate_handler![
             connect_db,
             login,
-            get_banks,
-            get_specialties,
-            /*add_specialty,
-            delete_specialty,
-            modify_specialty,
-            get_residents,
-            add_resident,
-            delete_resident,
-            modify_resident,
-            get_payments,
-            generate_payments,
-            get_rappels*/
-        ])
+            get_banques,
+            get_specialites,
+            add_specialite,
+            get_residents
+
+            ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
