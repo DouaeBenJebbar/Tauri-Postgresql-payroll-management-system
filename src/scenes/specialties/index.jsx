@@ -42,7 +42,7 @@ const Specialties = () => {
   const handleConfirmDelete = async () => {
     try {
       await invoke("delete_specialty", { id_specialite: specialtyToDelete });
-      const updatedSpecialties = await invoke("get_specialties");
+      const updatedSpecialties = await invoke("get_specialites");
       setSpecialties(updatedSpecialties);
       setFilteredSpecialties(updatedSpecialties);
       setSnackbarMessageType("success");
@@ -84,31 +84,35 @@ const Specialties = () => {
         throw new Error("La durée de formation doit être un entier positif.");
       }
   
+      const specialtyToSend = { specialite: newSpecialty }; // Ensure object structure matches Rust function
       if (formMode === "add") {
         // Perform specialty addition
-        await invoke("add_specialty", { specialty: newSpecialty });
+        await invoke("add_specialite", specialtyToSend);
         setSnackbarMessageType("success");
         setSnackbarMessage("Spécialité ajoutée avec succès!");
       } else if (formMode === "edit") {
         // Perform specialty modification
-        await invoke("modify_specialty", { specialty: newSpecialty });
+        await invoke("modify_specialite", specialtyToSend);
         setSnackbarMessageType("success");
         setSnackbarMessage("Spécialité modifiée avec succès!");
       }
   
       // Refresh specialties data
-      const updatedSpecialties = await invoke("get_specialties");
+      const updatedSpecialties = await invoke("get_specialites");
       setSpecialties(updatedSpecialties);
       setFilteredSpecialties(updatedSpecialties);
       handleClose();
     } catch (error) {
       console.error("Failed to add or modify specialty", error);
       setSnackbarMessageType("error");
-      setSnackbarMessage(error.message || "Échec d'ajout ou de modification de la spécialité.");
+      setSnackbarMessage(
+        error.message || "Échec d'ajout ou de modification de la spécialité."
+      );
     } finally {
       setSnackbarOpen(true);
     }
   };
+  
   
   const columns = [
     {
@@ -153,7 +157,7 @@ const Specialties = () => {
   useEffect(() => {
     const fetchSpecialties = async () => {
       try {
-        const data = await invoke("get_specialties");
+        const data = await invoke("get_specialites");
         setSpecialties(data);
         setFilteredSpecialties(data);
       } catch (error) {

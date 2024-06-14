@@ -197,16 +197,16 @@ function base64StringToBlob(base64, mimeType) {
   };
 
   const columns = [
-    { field: "resident_name", headerName: "Résident", flex: 1 },
+    { field: "nom_resident", headerName: "Résident", flex: 1 },
     { 
-      field: "date_payment", 
+      field: "date_paiement", 
       headerName: "Date de Paiement", 
       flex: 1,
     },
-    { field: "worked_days", headerName: "Jours travaillés", flex: 1 },
-    { field: "allocations_fam", headerName: "Allocations familiales", flex: 1 },
+    { field: "jours_travail", headerName: "Jours travaillés", flex: 1 },
+    { field: "allocations_familiales", headerName: "Allocations familiales", flex: 1 },
     {
-      field: "amount",
+      field: "montant",
       headerName: "Montant total",
       flex: 1,
       renderCell: (params) => {

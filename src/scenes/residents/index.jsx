@@ -20,14 +20,14 @@ const Residents = () => {
   const [selectedBank, setSelectedBank] = useState("");
   const [open, setOpen] = useState(false);
   const [newResident, setNewResident] = useState({
-    id:"",
+    id_resident:"",
     cin: "",
     nom_prenom: "",
     date_debut: "",
-    id_specialty: "",
+    id_specialite: "",
     rib: "",
     nombre_enfants: 0,
-    id_bank: "",
+    id_banque: "",
   });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -49,10 +49,10 @@ const Residents = () => {
         cin: resident.cin,
         nom_prenom: resident.nom_prenom,
         date_debut: resident.date_debut,
-        id_specialty: resident.id_specialty,
+        id_specialite: resident.id_specialite,
         rib: resident.rib,
         nombre_enfants: resident.nombre_enfants,
-        id_bank: resident.id_bank,
+        id_banque: resident.id_banque,
       });
       setFormMode("edit");
       setOpen(true);
@@ -99,10 +99,10 @@ const Residents = () => {
       cin: "",
       nom_prenom: "",
       date_debut: "",
-      id_specialty: "",
+      id_specialite: "",
       rib: "",
       nombre_enfants: 0,
-      id_bank: "",
+      id_banque: "",
     });
   };
 
@@ -110,13 +110,13 @@ const Residents = () => {
     const { name, value, type, checked } = e.target;
     setNewResident((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : (name === 'id_specialty' ? parseInt(value, 10) : value),
+      [name]: type === 'checkbox' ? checked : (name === 'id_specialite' ? parseInt(value, 10) : value),
     }));
   };
   
   const handleFormSubmit = async () => {
     try {
-      if (!newResident.nom_prenom || !newResident.date_debut || !newResident.id_specialty || !newResident.rib) {
+      if (!newResident.nom_prenom || !newResident.date_debut || !newResident.id_specialite || !newResident.rib) {
         throw new Error("Veuillez remplir tous les champs.");
       }
   
@@ -133,9 +133,9 @@ const Residents = () => {
       // Parse id_specialty, nombre_enfants, and rib to integer
       const resident = {
         ...newResident,
-        id_specialty: parseInt(newResident.id_specialty, 10),
+        id_specialite: parseInt(newResident.id_specialite, 10),
         nombre_enfants: childrenCount,
-        rib: rib,
+        rib: newResident.rib.toString(),
       };
   
       // Log the resident object
@@ -178,7 +178,7 @@ const Residents = () => {
     };
     const fetchSpecialties = async () => {
       try {
-        const data = await invoke("get_specialties");
+        const data = await invoke("get_specialites");
         setSpecialties(data);
         setLoading(false); // Set loading to false once data is fetched
       } catch (error) {
@@ -188,7 +188,7 @@ const Residents = () => {
     };
     const fetchBanks = async () => {
       try {
-        const data = await invoke("get_banks");
+        const data = await invoke("get_banques");
         setBanks(data);
       } catch (error) {
         console.error("Failed to fetch banks", error);
@@ -223,7 +223,7 @@ const Residents = () => {
     { field: "nom_prenom", headerName: "Nom et Prénom", width: 200 },
     { field: "date_debut", headerName: "Date de Début", width: 150 },
     { field: "date_fin", headerName: "Date de Fin", width: 150 },
-    {field: "specialty_name", headerName: "Spécialité", width: 150},
+    {field: "nom_specialite", headerName: "Spécialité", width: 150},
     { field: "rib", headerName: "RIB", width: 200 },
     { field: "nombre_enfants", headerName: "Nombre d'enfants", width: 150, type: "number" },
     {
@@ -363,12 +363,12 @@ const Residents = () => {
           />
           <TextField
             margin="dense"
-            id="id_specialty"
-            name="id_specialty"
+            id="id_specialite"
+            name="id_specialite"
             label="Spécialité"
             select
             fullWidth
-            value={newResident.id_specialty}
+            value={newResident.id_specialite}
             onChange={(e) => handleInputChange(e)}
             autoComplete="off"
             SelectProps={{
@@ -386,8 +386,8 @@ const Residents = () => {
                 if (selected === "") {
                   return <em>Sélectionnez une spécialité</em>;
                 }
-                const selectedSpecialty = specialties.find((specialty) => specialty.id === selected);
-                return selectedSpecialty.specialite;
+                const selectedSpecialty = specialties.find((specialty) => specialty.id_specialite === selected);
+                return selectedSpecialty.nom;
               },
             }}
           >
@@ -396,8 +396,8 @@ const Residents = () => {
               <MenuItem disabled>Loading...</MenuItem>
             ) : (
               specialties.map((specialty) => (
-                <MenuItem key={specialty.id} value={specialty.id}>
-                  {specialty.specialite}
+                <MenuItem key={specialty.id_specialite} value={specialty.id_specialite}>
+                  {specialty.nom}
                 </MenuItem>
               ))
             )}
@@ -416,12 +416,12 @@ const Residents = () => {
           />
           <TextField
             margin="dense"
-            id="id_bank"
-            name="id_bank"
+            id="id_banque"
+            name="id_banque"
             label="Banque"
             select
             fullWidth
-            value={newResident.id_bank}
+            value={newResident.id_banque}
             onChange={handleInputChange}
             autoComplete="off"
             SelectProps={{
@@ -438,8 +438,8 @@ const Residents = () => {
                 if (selected === "") {
                   return <em>Sélectionnez une banque</em>;
                 }
-                const selectedBank = banks.find((bank) => bank.id === selected);
-                return selectedBank.bank_name;
+                const selectedBank = banks.find((bank) => bank.id_banque === selected);
+                return selectedBank.nom;
               },
             }}
           >
@@ -447,8 +447,8 @@ const Residents = () => {
               <MenuItem disabled>Loading...</MenuItem>
             ) : (
               banks.map((bank) => (
-                <MenuItem key={bank.id} value={bank.id}>
-                  {bank.bank_name}
+                <MenuItem key={bank.id_banque} value={bank.id_banque}>
+                  {bank.nom}
                 </MenuItem>
               ))
             )}

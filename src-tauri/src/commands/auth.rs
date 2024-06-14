@@ -4,7 +4,6 @@ use crate::models::{AppState, LoginPayload};
 
 #[tauri::command]
 pub async fn login(payload: LoginPayload, state: State<'_, AppState>) -> Result<bool, String> {
-    println!("Attempting to login with username: {}", payload.username);
     let pool = state.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
     
@@ -16,10 +15,8 @@ pub async fn login(payload: LoginPayload, state: State<'_, AppState>) -> Result<
         Ok(row) => {
             let stored_password: String = row.try_get("password").map_err(|e| e.to_string())?;
             if stored_password == payload.password {
-                println!("Login successful for username: {}", payload.username);
                 Ok(true)
             } else {
-                println!("Invalid credentials for username: {}", payload.username);
                 Err("Invalid credentials".to_string())
             }
         }
