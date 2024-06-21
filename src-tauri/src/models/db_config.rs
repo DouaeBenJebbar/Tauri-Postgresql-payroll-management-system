@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DbConfig {
     pub host: String,
     pub user: String,
@@ -8,3 +8,4 @@ pub struct DbConfig {
     pub database: String,
     pub port: u16,
 }
+

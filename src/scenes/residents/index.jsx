@@ -21,7 +21,6 @@ const Residents = () => {
   const [open, setOpen] = useState(false);
   const [newResident, setNewResident] = useState({
     id_resident:"",
-    cin: "",
     nom_prenom: "",
     date_debut: "",
     id_specialite: "",
@@ -46,7 +45,6 @@ const Residents = () => {
     if (resident) {
       setNewResident({
         id_resident: resident.id_resident,
-        cin: resident.cin,
         nom_prenom: resident.nom_prenom,
         date_debut: resident.date_debut,
         id_specialite: resident.id_specialite,
@@ -60,8 +58,8 @@ const Residents = () => {
   };
   
 
-  const handleDeleteClick = (cin) => {
-    const resident = residents.find((resident) => resident.cin === cin);
+  const handleDeleteClick = (id_resident) => {
+    const resident = residents.find((resident) => resident.id_resident === id_resident);
     if (resident) {
       setResidentToDelete(resident);
       setConfirmationOpen(true);
@@ -71,7 +69,7 @@ const Residents = () => {
   const handleConfirmDelete = async () => {
     if (residentToDelete) {
       try {
-        await invoke("delete_resident", { cin: residentToDelete.cin });
+        await invoke("delete_resident", { id: residentToDelete.id_resident });
         const updatedResidents = await invoke("get_residents");
         setResidents(updatedResidents);
         setFilteredResidents(updatedResidents);
@@ -96,7 +94,6 @@ const Residents = () => {
   const handleClose = () => {
     setOpen(false);
     setNewResident({
-      cin: "",
       nom_prenom: "",
       date_debut: "",
       id_specialite: "",
@@ -143,6 +140,9 @@ const Residents = () => {
   
       if (formMode === "add") {
         await invoke("add_resident", { resident });
+        const getResponse = await invoke("get_resident_id", { nomPrenom: newResident.nom_prenom }); 
+        console.log(getResponse);
+        await invoke("generate_rappel", { residentId: getResponse });
         setSnackbarMessageType("success");
         setSnackbarMessage("Resident ajouté avec succès!");
       } else if (formMode === "edit") {
@@ -150,7 +150,6 @@ const Residents = () => {
         setSnackbarMessageType("success");
         setSnackbarMessage("Resident modifié avec succès!");
       }
-      await invoke("generate_payments", { resident });
   
       const updatedResidents = await invoke("get_residents");
       setResidents(updatedResidents);
@@ -219,7 +218,6 @@ const Residents = () => {
   };
 
   const columns = [
-    { field: "cin", headerName: "CIN", width: 150 },
     { field: "nom_prenom", headerName: "Nom et Prénom", width: 200 },
     { field: "date_debut", headerName: "Date de Début", width: 150 },
     { field: "date_fin", headerName: "Date de Fin", width: 150 },
@@ -245,7 +243,7 @@ const Residents = () => {
             variant="contained"
             sx={{ bgcolor: '#f44336', color: '#fff', '&:hover': { bgcolor: '#d32f2f' } }}
             size="small"
-            onClick={() => handleDeleteClick(params.row.cin)}
+            onClick={() => handleDeleteClick(params.row.id_resident)}
           >
             Supprimer
           </Button>
@@ -316,7 +314,7 @@ const Residents = () => {
         <DataGrid
         rows={filteredResidents}
         columns={columns}
-        getRowId={(row) => row.cin}
+        getRowId={(row) => row.id_resident}
         disableSelectionOnClick
         autoHeight
         hideFooter
@@ -327,17 +325,6 @@ const Residents = () => {
       <Dialog open={open} onClose={handleClose}>
         <DialogTitle>{formMode === "add" ? "Ajouter Resident" : "Modifier Resident"}</DialogTitle>
         <DialogContent>
-          <TextField
-            margin="dense"
-            id="cin"
-            name="cin"
-            label="CIN"
-            type="text"
-            fullWidth
-            value={newResident.cin}
-            onChange={handleInputChange}
-            autoComplete="off"
-          />
           <TextField
             margin="dense"
             id="nom_prenom"

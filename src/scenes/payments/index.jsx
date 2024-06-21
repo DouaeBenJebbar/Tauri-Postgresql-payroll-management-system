@@ -20,8 +20,9 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { tokens } from "../../theme";
 import Header from "../../components/Header";
 import SearchIcon from "@mui/icons-material/Search";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
+import { saveAs } from 'file-saver';
+import ExcelJS from 'exceljs';
+import n2words from 'n2words';
 
 
 const Payments = () => {
@@ -53,79 +54,220 @@ const Payments = () => {
 
   const [reloadTrigger, setReloadTrigger] = useState(false); 
 
+  const handleGenerateClick = async () => {
+    try {
+      // Load header template
+      const headerResponse = await fetch('/templates/headerOV.xlsx');
+      if (!headerResponse.ok) {
+        throw new Error('Failed to fetch template file');
+      }
+      const headerArrayBuffer = await headerResponse.arrayBuffer();
+  
+      // Load workbook and modify existing worksheet
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(headerArrayBuffer);
+      const worksheet = workbook.getWorksheet(1); // Assuming data starts on the first sheet
+  
+  
+      // Start inserting data from row 20
+      let startDataRow = 20;
+      let currentRow = startDataRow;
+      let currentPageHeight = 385; // Height of header on the first page
+      const maxPageHeight = 11 * 72; // Maximum page height for letter size (11 inches) in points
+      const rowHeightPoints = 24; // Standard row height in points
+      let endDataRow = 0;
+  
+      let previousTotalARow = startDataRow - 1; // Track the previous TOTAL A REPORTER row
+      let previousTotalRow = startDataRow - 2; // Track the previous TOTAL REPORTE row
+  
+      filteredPayments.forEach(payment => {
+        const row = worksheet.addRow([
+          payment.nom_resident,
+          payment.rib,
+          payment.nom_banque,
+          parseFloat(payment.montant) // Ensure montant is parsed as float
+        ]);
+  
+        // Apply styles to cells in the current row
+        row.eachCell((cell, colNumber) => {
+          switch (colNumber) {
+            case 1: // nom_resident
+              cell.font = { name: 'Times New Roman', size: 16, bold: true, italic: true };
+              cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+              break;
+            case 2: // rib
+              cell.font = { name: 'Times New Roman', size: 16, bold: true };
+              cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+              break;
+            case 3: // nom_banque
+              cell.font = { name: 'Times New Roman', size: 14, bold: true, italic: true };
+              cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+              break;
+            case 4: // montant
+              cell.font = { name: 'Times New Roman', size: 14, bold: true };
+              cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+              cell.numFmt = '#,##0.00'; // Format as number with two decimal places
+              break;
+            default:
+              break;
+        }
+        // Set height of the row to standard row height
+        worksheet.getRow(currentRow).height = rowHeightPoints;
+        // Add border to each cell
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+        // Add row height to current page height
+        currentPageHeight += rowHeightPoints;
+        currentRow++;
+  
+        // Check if inserting another row would exceed the maximum page height
+      if (currentPageHeight + rowHeightPoints> maxPageHeight) {
+        // Update endDataRow to the last data entry before "TOTAL A REPORTER"
+        endDataRow = currentRow - 1;
 
-const handleGenerateClick = async () => {
-  try {
-    // Load the Excel template file
-    const response = await fetch('/templates/ovTemplate.xlsx');
-    if (!response.ok) {
-      throw new Error('Failed to fetch template file');
+        // Insert TOTAL A REPORTER row
+        insertTotalRow(worksheet, currentRow, 'TOTAL A REPORTER', startDataRow, endDataRow);
+
+        // Move to the next row for TOTAL REPORTE
+        currentRow++;
+
+        startDataRow = currentRow;
+        insertTotalRow(worksheet, currentRow, 'TOTAL REPORTE', startDataRow, previousTotalRow);
+
+        // Move to the next row after TOTAL REPORTE
+        currentRow++;
+
+        // Reset current page height to header height for new page
+        currentPageHeight = 100; // Assuming header height is 385 points
+
+        // Update previousTotalARow and previousTotalRow for the next page
+        previousTotalARow = currentRow - 3; // Subtracting 3 because we added 3 rows (1 TOTAL A REPORTER, 1 TOTAL REPORTE, 1 blank row)
+        previousTotalRow = currentRow - 2;
+      }
+            });
+  
+      // Ensure the worksheet has at least 45 lines including header
+      const minimumRows = 45;
+      const totalRows = worksheet.rowCount;
+      const rowsToAdd = minimumRows - totalRows; // Calculate rows to add
+  
+      // Add rows if necessary to reach minimum rows
+      if (rowsToAdd > 0) {
+        for (let i = 0; i < rowsToAdd; i++) {
+          worksheet.addRow([]);
+        }
+      }
+      // After the loop for adding static data rows
+
+      // Insert "Total Général" row
+      insertTotalRow(worksheet, currentRow, 'TOTAL GENERAL', startDataRow, currentRow - 1);
+      let totalGeneralValue = 0;
+      for (let i = startDataRow; i < currentRow; i++) {
+        const cellValue = worksheet.getCell(`D${i}`).value;
+        if (typeof cellValue === 'number') {
+          totalGeneralValue += cellValue;
+        }
+      }
+  
+      // Convert the manually calculated total general value to French words
+      const letterVersion = n2words(totalGeneralValue, { lang: 'fr' });
+
+      // Assuming B18:D18 are already merged, set the value in B18
+      const totalCell = worksheet.getCell(`A18`);
+      totalCell.value = totalGeneralValue;
+      const mergedCell = worksheet.getCell(`B18`);
+      mergedCell.value = letterVersion;
+  
+
+
+      // Increment currentRow to move to the next row for the footer
+      currentRow++;
+  
+      // First row of the footer: Merge cells A, B, C, and D and add text
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const firstFooterRow = worksheet.getCell(`A${currentRow}`);
+      firstFooterRow.value = `Le règlement des indemnités de fonction et allocations familiales des résidents au titre du mois de ${selectedMonth} ${selectedYear}`;
+      firstFooterRow.font = { name: 'Times New Roman', bold: true, size: 14 };
+      firstFooterRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  
+      // Set height of the first footer row to 39 pixels
+      worksheet.getRow(currentRow).height = 39;
+  
+      // Second row of the footer: Individual cells for "L'ORDONNATEUR" and merged cells for "LE FONDE DE POUVOIRS"
+      currentRow++; // Move to the next row
+      const secondFooterRowA = worksheet.getCell(`A${currentRow}`);
+      secondFooterRowA.value = "L'ORDONNATEUR";
+      secondFooterRowA.font = { name: 'Arial', bold: true, size: 16 };
+      secondFooterRowA.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  
+      // Merge cells C and D in the second footer row
+      worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
+      const secondFooterRowCD = worksheet.getCell(`C${currentRow}`);
+      secondFooterRowCD.value = "LE FONDE DE POUVOIRS";
+      secondFooterRowCD.font = { name: 'Arial', bold: true, size: 16 };
+      secondFooterRowCD.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  
+      // Save the modified workbook
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, 'generatedFile.xlsx');
+    } catch (error) {
+      console.error('Error generating Excel file from template:', error);
+      throw error;
     }
-
-    const templateArrayBuffer = await response.arrayBuffer();
-    const templateWorkbook = XLSX.read(templateArrayBuffer, { type: 'array' });
-
-    const templateWorksheetName = templateWorkbook.SheetNames[0];
-    const templateWorksheet = templateWorkbook.Sheets[templateWorksheetName];
-
-    // Find the last row with data in the template to avoid overwriting existing data
-    const range = XLSX.utils.decode_range(templateWorksheet['!ref']);
-    const lastRow = range.e.r + 1;
-
-    // Convert filteredPayments data to the format expected by the template
-    const excelData = filteredPayments.map(payment => [
-      payment.resident_name,
-      payment.rib,
-      payment.bank_name,
-      payment.amount,
-    ]);
-
-    // Add the new data starting from the appropriate row
-    XLSX.utils.sheet_add_aoa(templateWorksheet, excelData, { origin: `A${lastRow + 1}` });
-
-    // Calculate the total of all payments
-    const totalPayments = filteredPayments.reduce((acc, curr) => acc + parseFloat(curr.amount), 0).toFixed(2);
-
-    // Append the total to the total row in the worksheet
-    const totalRow = `A${lastRow + 1 + filteredPayments.length}`;
-    XLSX.utils.sheet_add_aoa(templateWorksheet, [['Total', '', '', totalPayments]], { origin: totalRow });
-
-    // Add the updated worksheet to a new workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, templateWorksheet, 'Payments');
-
-    // Write the workbook to a binary string
-    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
-
-    // Convert binary string to blob
-    const buffer = new ArrayBuffer(wbout.length);
-    const view = new Uint8Array(buffer);
-    for (let i = 0; i < wbout.length; ++i) {
-      view[i] = wbout.charCodeAt(i) & 0xFF;
+  };
+  
+  // Function to insert custom styling row for TOTAL A REPORTER and TOTAL REPORTE
+  function insertTotalRow(worksheet, rowNumber, text, startDataRow, endDataRow) {
+    // Merge cells A, B, C, and D for the total row
+    worksheet.mergeCells(`A${rowNumber}:C${rowNumber}`);
+    const totalRowA = worksheet.getCell(`A${rowNumber}`);
+    totalRowA.value = text;
+    totalRowA.font = { name: 'Times New Roman', bold: true, size: 12};
+    totalRowA.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  
+    // Set background fill color for the total row
+    totalRowA.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFBFBFBF' }, 
+    };
+  
+    // Cell D for the total row with reference to previous total cell
+    const totalRowD = worksheet.getCell(`D${rowNumber}`);
+    if (text === 'TOTAL A REPORTER'|| text === 'TOTAL GENERAL') {
+      // Sum from D[startDataRow] to D[endDataRow]
+      totalRowD.value = { formula: `SUM(D${startDataRow}:D${endDataRow})` };
+    } else if (text === 'TOTAL REPORTE') {
+      // Reference the cell above it
+      totalRowD.value = { formula: `D${rowNumber - 1}` };
     }
-    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    totalRowD.font = { name: 'Arial', bold: true ,size: 14};
+    totalRowD.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    totalRowD.numFmt = '#,##0.00'; // Format as number with two decimal places
+  
+    // Set border for the total row
+    totalRowA.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
 
-    // Use saveAs or a similar method to save the blob
-    saveAs(blob, 'filename.xlsx');
+    totalRowD.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
 
-    setSnackbarMessage('Fichier Excel généré avec succès !');
-    setSnackbarOpen(true);
-  } catch (error) {
-    console.error('Error generating file: ', error);
-    setSnackbarMessage('Échec de la génération du fichier Excel.');
-    setSnackbarOpen(true);
-  }
-};
-
-// Utility function to convert a base64 string to a Blob
-function base64StringToBlob(base64, mimeType) {
-  const byteCharacters = atob(base64);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: mimeType });
+    // Set height of the total row to standard row height in points
+    worksheet.getRow(rowNumber).height = 33.75; // Adjust height as needed
 }
 
   
@@ -133,29 +275,32 @@ function base64StringToBlob(base64, mimeType) {
   useEffect(() => {
     const fetchPayments = async () => {
       try {
-        const data = await invoke("get_payments");
-        setPayments(data);
-        setFilteredPayments(data);
+        const data = await invoke("get_paiments");
+        // Add unique id to each payment object
+        const paymentsWithIds = data.map((payment, index) => ({ ...payment, id: index + 1 }));
+        setPayments(paymentsWithIds);
+        setFilteredPayments(paymentsWithIds);
         extractUniqueYears(data); // Extract unique years
       } catch (error) {
         console.error("Échec de la récupération des paiements", error);
       }
     };
+    
     fetchPayments();
   }, [reloadTrigger]);
 
   useEffect(() => {
     let filtered = payments.filter((payment) =>
-      payment.resident_name.toString().includes(searchInput)
+      payment.nom_resident ? payment.nom_resident.toString().includes(searchInput) : false
     );
     if (selectedMonth) {
       filtered = filtered.filter(
-        (payment) => new Date(payment.date_payment).getMonth() === months.indexOf(selectedMonth)
+        (payment) => new Date(payment.date_paiement).getMonth() === months.indexOf(selectedMonth)
       );
     }
     if (selectedYear) {
       filtered = filtered.filter(
-        (payment) => new Date(payment.date_payment).getFullYear() === parseInt(selectedYear, 10)
+        (payment) => new Date(payment.date_paiement).getFullYear() === parseInt(selectedYear, 10)
       );
     }
     setFilteredPayments(filtered);
@@ -167,8 +312,8 @@ function base64StringToBlob(base64, mimeType) {
       const monthsWithPayments = [
         ...new Set(
           payments
-            .filter(payment => new Date(payment.date_payment).getFullYear() === parseInt(selectedYear))
-            .map(payment => months[new Date(payment.date_payment).getMonth()])
+            .filter(payment => new Date(payment.date_paiement).getFullYear() === parseInt(selectedYear))
+            .map(payment => months[new Date(payment.date_paiement).getMonth()])
         )
       ];
       if (!monthsWithPayments.includes(currentMonth)) {
@@ -179,7 +324,7 @@ function base64StringToBlob(base64, mimeType) {
   }, [selectedYear, payments, currentMonth]);
 
   const extractUniqueYears = (payments) => {
-    const years = payments.map(payment => new Date(payment.date_payment).getFullYear());
+    const years = payments.map(payment => new Date(payment.date_paiement).getFullYear());
     const uniqueYears = [...new Set(years)];
     setUniqueYears(uniqueYears);
   };
@@ -221,9 +366,10 @@ function base64StringToBlob(base64, mimeType) {
 
   
   const totalPayments = filteredPayments.reduce((acc, curr) => {
-    const amount = Number(curr.amount);
+    const amount = parseFloat(curr.montant);
     return acc + (isNaN(amount) ? 0 : amount);
   }, 0);
+
   
 
   return (
@@ -321,7 +467,7 @@ function base64StringToBlob(base64, mimeType) {
         <DataGrid
           rows={filteredPayments}
           columns={columns}
-          getRowId={(row) => row.id_payment}
+          getRowId={(row) => row.id_paiement} // Adjust according to your actual id property name
           disableSelectionOnClick
           autoHeight
         />

@@ -34,4 +34,5 @@ impl From<sqlx::Error> for MyError {
 
 pub struct AppState {
     pub pool: Arc<Mutex<Option<PgPool>>>,
+    pub db_credentials: Arc<Mutex<Option<DbConfig>>>,
 }

@@ -5,7 +5,6 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Resident {
     pub id_resident: i32,
-    pub cin: String,
     pub nom_prenom: String,
     pub date_debut: chrono::NaiveDate,
     pub id_specialite: Option<i32>,
@@ -19,7 +18,6 @@ pub struct Resident {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewResident {
-    pub cin: String,
     pub nom_prenom: String,
     pub date_debut: chrono::NaiveDate,
     pub id_specialite: Option<i32>,

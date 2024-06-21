@@ -15,5 +15,8 @@ pub use db::{
     modify_resident,
     get_paiments,
     generate_payments,
-    get_rappels
+    get_rappels,
+    generate_rappel,
+    start_scheduler,
+    get_resident_id
 };

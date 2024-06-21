@@ -26,5 +26,8 @@ pub struct RappelAnnuel{
     pub duree_rappel: i32,
     pub montant: BigDecimal,
     pub nom_resident: Option<String>,
+    pub rib: Option<i32>,
+    pub nom_banque: Option<String>,
+    pub date_generation: Option<NaiveDate>,
 }
 

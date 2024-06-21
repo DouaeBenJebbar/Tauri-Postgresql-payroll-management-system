@@ -1,10 +1,12 @@
 use sqlx::postgres::PgPoolOptions;
-use tauri::State;
-use crate::models::{AppState, DbConfig, Specialite,Resident ,MyError,NewSpecialite,NewResident,Banque,PaiementMensuel,RappelAnnuel};
+use crate::models::{AppState, DbConfig, Specialite, Resident, MyError, NewSpecialite, NewResident, Banque, PaiementMensuel, RappelAnnuel};
 use thiserror::Error;
 use bigdecimal::BigDecimal;
 use std::str::FromStr;
 use chrono::{Local, NaiveDate};
+use tauri::{Manager, State};
+use tokio_cron_scheduler::{Job, JobScheduler};
+use std::sync::Arc;
 
 #[tauri::command]
 pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<String, String> {
@@ -21,6 +23,15 @@ pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<
         Ok(pool) => {
             let mut pool_guard = state.pool.lock().await;
             *pool_guard = Some(pool);
+            // Store credentials in the application state after successful connection
+            let mut credentials_guard = state.db_credentials.lock().await;
+            *credentials_guard = Some(DbConfig {
+                user: config.user,
+                password: config.password,
+                host: config.host,
+                port: config.port,
+                database: config.database,
+            });            
             Ok("Database connection established successfully.".to_string())
         },
         Err(e) => Err(format!("Failed to connect to the database: {}", e)),
@@ -92,17 +103,18 @@ pub async fn add_specialite(pool: State<'_, AppState>, specialite: NewSpecialite
 }
 
 #[tauri::command]
-pub async fn delete_specialite(pool: State<'_, AppState>, nom_specialite: String) -> Result<(), String> {
+pub async fn delete_specialite(pool: State<'_, AppState>, id_specialite: i32) -> Result<(), String> {
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
 
-    sqlx::query!("DELETE FROM specialites WHERE nom = $1", nom_specialite)
+    sqlx::query!("DELETE FROM specialites WHERE id_specialite = $1", id_specialite)
         .execute(pool)
         .await
         .map_err(|e| format!("Failed to delete specialty: {}", e))?;
 
     Ok(())
 }
+
 #[tauri::command]
 pub async fn modify_specialite(pool: State<'_, AppState>, specialite: Specialite) -> Result<(), String> {
     let pool = pool.pool.lock().await;
@@ -141,8 +153,6 @@ pub async fn modify_specialite(pool: State<'_, AppState>, specialite: Specialite
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
-    #[error("Le CIN ne peut pas être vide")]
-    EmptyCIN,
     #[error("Le RIB doit être une valeur numérique")]
     InvalidRIB,
     #[error("Le nombre d'enfants ne peut pas être négatif")]
@@ -155,7 +165,6 @@ pub enum ValidationError {
 
 
 trait ValidatableResident {
-    fn cin(&self) -> &str;
     fn rib(&self) -> &str;
     fn nombre_enfants(&self) -> i32;
     fn id_specialite(&self) -> i32;
@@ -163,9 +172,6 @@ trait ValidatableResident {
 }
 
 impl ValidatableResident for Resident {
-    fn cin(&self) -> &str {
-        &self.cin
-    }
 
     fn rib(&self) -> &str {
         &self.rib
@@ -185,9 +191,6 @@ impl ValidatableResident for Resident {
 }
 
 impl ValidatableResident for NewResident {
-    fn cin(&self) -> &str {
-        &self.cin
-    }
 
     fn rib(&self) -> &str {
         &self.rib
@@ -208,9 +211,6 @@ impl ValidatableResident for NewResident {
 
 
 fn validate_resident<R: ValidatableResident>(resident: &R) -> Result<(), String> {
-    if resident.cin().trim().is_empty() {
-        return Err(ValidationError::EmptyCIN.to_string());
-    }
 
     if !resident.rib().to_string().chars().all(|c| c.is_numeric()) {
         return Err(ValidationError::InvalidRIB.to_string());
@@ -242,7 +242,6 @@ pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, S
         r#"
         SELECT 
             residents.id_resident as "id_resident",
-            residents.cin as "cin",
             residents.nom_prenom as "nom_prenom",
             residents.date_debut as "date_debut",
             residents.id_specialite as "id_specialite",
@@ -265,21 +264,45 @@ pub async fn get_residents(pool: State<'_, AppState>) -> Result<Vec<Resident>, S
     let residents: Vec<Resident> = records
         .into_iter()
         .map(|record| Resident {
-            id_resident: record.id_resident.expect("id_resident is None"),
-            cin: record.cin.expect("cin is None"),
-            nom_prenom: record.nom_prenom.expect("nom_prenom is None"),
-            date_debut: record.date_debut.expect("date_debut is None"),
+            id_resident: record.id_resident,
+            nom_prenom: record.nom_prenom,
+            date_debut: record.date_debut,
             id_specialite: Some(record.id_specialite.expect("id_specialty is None")),
             date_fin: record.date_fin,
-            rib: record.rib.expect("rib is None"),
+            rib: record.rib,
             nombre_enfants: record.nombre_enfants.expect("nombre_enfants is None"),
             id_banque: Some(record.id_banque.expect("id_bank is None")),
             nom_specialite: record.nom_specialite,
-            nom_banque: Some(record.nom_banque),
+            nom_banque: record.nom_banque,
         })
         .collect();
 
     Ok(residents)
+}
+
+#[tauri::command]
+pub async fn get_resident_id(pool: State<'_, AppState>, nom_prenom: String) -> Result<i32, String> {
+    let pool = pool.pool.lock().await;
+    // Assuming pool is an Option<Pool<Postgres>>, ensure it's not None
+    let pool = match pool.as_ref() {
+        Some(pool) => pool,
+        None => return Err("Database pool is not initialized".into()),
+    };
+
+    let recs = sqlx::query!(
+        "SELECT id_resident FROM residents WHERE nom_prenom = $1",
+        nom_prenom
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Failed to find resident by nom_prenom: {}", e))?;
+
+    // Assuming you're expecting only one record, adjust as needed
+    if let Some(rec) = recs.first() {
+        Ok(rec.id_resident)
+    } else {
+        Err("No resident found with the provided nom_prenom".into())
+    }
 }
 
 
@@ -291,8 +314,7 @@ pub async fn add_resident(pool: State<'_, AppState>, resident: NewResident) -> R
     validate_resident(&resident).map_err(|e| e.to_string())?;
   
     sqlx::query!(
-      "INSERT INTO residents (cin, nom_prenom, date_debut, id_specialite, rib, nombre_enfants, id_banque) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      resident.cin,
+      "INSERT INTO residents (nom_prenom, date_debut, id_specialite, rib, nombre_enfants, id_banque) VALUES ($1, $2, $3, $4, $5, $6)",
       resident.nom_prenom,
       resident.date_debut,
       resident.id_specialite,
@@ -308,13 +330,13 @@ pub async fn add_resident(pool: State<'_, AppState>, resident: NewResident) -> R
 }
 
 #[tauri::command]
-pub async fn delete_resident(pool: State<'_, AppState>, cin: String) -> Result<(), String> {
+pub async fn delete_resident(pool: State<'_, AppState>, id: i32) -> Result<(), String> {
     let pool = pool.pool.lock().await;
     let pool = pool.as_ref().ok_or("Database not connected")?;
   
     sqlx::query!(
-        "DELETE FROM residents WHERE cin = $1",
-        cin
+        "DELETE FROM residents WHERE id_resident = $1",
+        id
     )
     .execute(pool)
     .await
@@ -337,9 +359,8 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
             id_specialite = $3,
             id_banque = $4,
             rib = $5, 
-            nombre_enfants = $6 ,
-            cin = $7
-            WHERE id_resident = $8",
+            nombre_enfants = $6
+            WHERE id_resident = $7",
 
         resident.nom_prenom,
         resident.date_debut,
@@ -347,7 +368,6 @@ pub async fn modify_resident(pool: State<'_, AppState>, resident: Resident) -> R
         resident.id_banque,
         resident.rib,
         resident.nombre_enfants,
-        resident.cin,
         resident.id_resident
     )
     .execute(pool)
@@ -423,8 +443,6 @@ pub async fn generate_payments(pool: State<'_, AppState>) -> Result<(), String> 
     Ok(())
 }
 
-
-
 //manage rappels annuels
 
 #[tauri::command]
@@ -440,9 +458,13 @@ pub async fn get_rappels(pool: State<'_, AppState>) -> Result<Vec<RappelAnnuel>,
             rappels_annuels.exercice as "exercice?",
             rappels_annuels.duree_rappel as "duree_rappel?",
             rappels_annuels.montant as "montant?",
-            residents.nom_prenom as "nom_resident?"
+            rappels_annuels.date_generation as "date_generation?",
+            residents.nom_prenom as "nom_resident?",
+            residents.rib as "rib?",
+            banque.nom as "nom_banque?"
         FROM rappels_annuels
         LEFT JOIN residents ON rappels_annuels.id_resident = residents.id_resident
+        LEFT JOIN banque ON residents.id_banque = banque.id_banque
         "#
     )
     .fetch_all(pool_ref)
@@ -457,10 +479,66 @@ pub async fn get_rappels(pool: State<'_, AppState>) -> Result<Vec<RappelAnnuel>,
     exercice: record.exercice.expect("exercice is None"),
     duree_rappel: record.duree_rappel.expect("duree_rappel is None"),
     montant: record.montant.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")).expect("montant is None"),
+    date_generation: Some(record.date_generation.expect("date_generation is None")),
     nom_resident: record.nom_resident,
+    rib: record.rib.map(|rib| rib.parse::<i32>().expect("Failed to parse rib as i32")),
+    nom_banque: record.nom_banque,
     })
     .collect();
 
     Ok(rappels)
 }
 
+
+#[tauri::command]
+pub async fn generate_rappel(pool: State<'_, AppState>, resident_id: i32) -> Result<(), String> {
+    let pool = pool.pool.lock().await;
+    let pool = pool.as_ref().ok_or("Database not connected")?;
+
+    let current_date: NaiveDate = Local::now().naive_local().date();
+
+    sqlx::query!(
+        "SELECT generate_yearly_payments($1, $2)",
+        resident_id,
+        current_date
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| format!("Failed to generate rappel: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn start_scheduler<R: tauri::Runtime>(manager: tauri::AppHandle<R>) -> Result<(), String> {
+    // Check if the scheduler is already running
+    let state = manager.state::<AppState>();
+    {
+        let pool_guard = state.pool.lock().await;
+        if pool_guard.is_none() {
+            eprintln!("Database pool is not connected.");
+            return Err("Database not connected".to_string());
+        }
+    }
+
+    // Set up the job scheduler
+    let scheduler = JobScheduler::new().await.map_err(|e| format!("Failed to create scheduler: {}", e))?;
+    let manager_arc = Arc::new(manager.clone());
+
+    // Define the job to generate payments
+    let job = Job::new_async("0 0 1 * * *", move |_uuid, _l| {
+        let manager_clone = manager_arc.clone();
+        Box::pin(async move {
+            if let Err(e) = generate_payments(manager_clone.state::<AppState>()).await {
+                eprintln!("Failed to generate payments: {}", e);
+            }
+        })
+    }).map_err(|e| format!("Failed to create job: {}", e))?;
+
+    scheduler.add(job).await.map_err(|e| format!("Failed to add job to scheduler: {}", e))?;
+
+    // Start the scheduler
+    scheduler.start().await.map_err(|e| format!("Failed to start scheduler: {}", e))?;
+
+    Ok(())
+}

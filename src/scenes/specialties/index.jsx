@@ -41,7 +41,7 @@ const Specialties = () => {
   
   const handleConfirmDelete = async () => {
     try {
-      await invoke("delete_specialty", { id_specialite: specialtyToDelete });
+      await invoke("delete_specialite", { idSpecialite: specialtyToDelete });
       const updatedSpecialties = await invoke("get_specialites");
       setSpecialties(updatedSpecialties);
       setFilteredSpecialties(updatedSpecialties);
@@ -57,6 +57,8 @@ const Specialties = () => {
       setConfirmationOpen(false);
     }
   };
+  
+  
   
   const handleClose = () => {
     setOpen(false);
