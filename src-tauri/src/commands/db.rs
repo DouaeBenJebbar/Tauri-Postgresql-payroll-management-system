@@ -8,6 +8,7 @@ use tauri::{Manager, State};
 use tokio_cron_scheduler::{Job, JobScheduler};
 use std::sync::Arc;
 
+
 #[tauri::command]
 pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<String, String> {
     let connection_str = format!(
