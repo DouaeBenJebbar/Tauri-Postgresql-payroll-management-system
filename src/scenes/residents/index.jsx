@@ -122,10 +122,6 @@ const Residents = () => {
         throw new Error("Le nombre d'enfants doit être un entier non négatif.");
       }
   
-      const rib = parseInt(newResident.rib, 10);
-      if (isNaN(rib)) {
-        throw new Error("Le RIB doit être un entier.");
-      }
   
       // Parse id_specialty, nombre_enfants, and rib to integer
       const resident = {

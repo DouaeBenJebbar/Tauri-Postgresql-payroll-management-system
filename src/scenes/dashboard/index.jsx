@@ -2,153 +2,169 @@ import React, { useEffect, useState } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 import Header from "../../components/Header";
 import GroupsIcon from '@mui/icons-material/Groups';
-import StarsIcon from '@mui/icons-material/Stars';
 import PaidIcon from '@mui/icons-material/Paid';
 import StatBox from "../../components/StatBox";
 import { tokens } from "../../theme";
 import { invoke } from "@tauri-apps/api/tauri";
-
-const NotificationItem = ({ message }) => {
-  const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
-
-  return (
-    <Box
-      p="10px"
-      mb="10px"
-      borderRadius="4px"
-      backgroundColor={colors.blueAccent[500] }
-      boxShadow="0px 0px 5px rgba(0, 0, 0, 0.1)"
-      height="50px"
-    >
-      <Typography variant="body2">{message}</Typography>
-    </Box>
-  );
-};
-
-// Notifications component
-const Notifications = () => {
-  const theme = useTheme();
-  const colors = tokens(theme.palette.mode);
-  const notifications = [
-    "New user registered",
-    "Server error reported",
-    "New message received",
-    "Update available",
-    // Add more notifications as needed
-  ];
-
-  return (
-    <Box
-      p="15px"
-      borderRadius="4px"
-      boxShadow="5px 5px 5px rgba(0, 0, 0, 0.1)"
-      height="100%"
-      backgroundColor={colors.primary[400]}
-    >
-      <Typography variant="h6" gutterBottom >
-        Notifications
-      </Typography>
-      <Box overflow="auto" height="100%" >
-        {notifications.map((message, index) => (
-          <NotificationItem key={index} message={message} />
-        ))}
-      </Box>
-    </Box>
-  );
-};
+import dayjs from 'dayjs';
+import 'dayjs/locale/fr'; // Import the French locale
 
 const Dashboard = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  
-  const [residentsCount, setResidentsCount] = useState(0); // Define residentsCount state
+
+  const [residentsCount, setResidentsCount] = useState(0);
+  const [monthlyPaymentsTotal, setMonthlyPaymentsTotal] = useState(0);
+  const [monthlyRappelsTotal, setMonthlyRappelsTotal] = useState(0);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchResidents = async () => {
       try {
         const data = await invoke("get_residents");
-        setResidentsCount(data.length); // Update residentsCount state with the length of data
+        setResidentsCount(data.length);
       } catch (error) {
         console.error("Failed to fetch residents", error);
       }
     };
 
-    fetchData();
+    const fetchPayments = async () => {
+      try {
+        const paymentsData = await invoke("get_paiments");
+        console.log("Payments data:", paymentsData);
+
+        const currentMonth = dayjs().month();
+        const currentYear = dayjs().year();
+
+        let totalPayments = 0;
+
+        paymentsData.forEach(payment => {
+          if (!payment.date_paiement || !payment.montant) {
+            console.warn("Missing date or amount in payment:", payment);
+            return;
+          }
+
+          const paymentDate = dayjs(payment.date_paiement);
+          const amount = parseFloat(payment.montant);
+
+          if (paymentDate.month() === currentMonth && paymentDate.year() === currentYear) {
+            if (!isNaN(amount)) {
+              totalPayments += amount;
+            } else {
+              console.warn("Invalid payment amount:", payment.montant);
+            }
+          }
+        });
+
+        console.log("Total payments for the current month:", totalPayments);
+        setMonthlyPaymentsTotal(totalPayments);
+      } catch (error) {
+        console.error("Failed to fetch payments", error);
+      }
+    };
+
+    const fetchRappels = async () => {
+      try {
+        const rappelsData = await invoke("get_rappels");
+        console.log("Rappels data:", rappelsData);
+    
+        const currentMonth = dayjs().month();
+        const currentYear = dayjs().year();
+    
+        let totalRappels = 0;
+    
+        rappelsData.forEach(rappel => {
+          if (!rappel.date_generation || !rappel.montant) {
+            console.warn("Missing date or amount in rappel:", rappel);
+            return;
+          }
+    
+          const rappelDate = dayjs(rappel.date_generation);
+          const amount = parseFloat(rappel.montant);
+    
+          if (rappelDate.month() === currentMonth && rappelDate.year() === currentYear) {
+            if (!isNaN(amount)) {
+              totalRappels += amount;
+            } else {
+              console.warn("Invalid rappel amount:", rappel.montant);
+            }
+          }
+        });
+    
+        console.log("Total rappels for the current month:", totalRappels);
+        setMonthlyRappelsTotal(totalRappels);
+      } catch (error) {
+        console.error("Failed to fetch rappels", error);
+      }
+    };
+    
+
+    fetchResidents();
+    fetchPayments();
+    fetchRappels();
   }, []);
+
+  dayjs.locale('fr');
+  const currentMonthName = dayjs().format('MMMM');
+  const currentYear = dayjs().year();
 
   return (
     <Box m="20px">
-      <Header title="DASHBOARD"/>
-      <Box display="flex" gap="20px">
-        {/* StatBox Grid */}
+      {/* HEADER */}
+      <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Header title="DASHBOARD" />
+      </Box>
+
+      {/* STATBOXES - Full Width */}
+      <Box
+        display="grid"
+        gridTemplateColumns="repeat(3, 1fr)"
+        gridAutoRows="140px"
+        gap="20px"
+        mt="20px"
+      >
+        {/* Residents Stats */}
         <Box
-          display="grid"
-          gridTemplateColumns="repeat(6, 1fr)" // Adjust the number of columns
-          gridTemplateRows="repeat(2, 140px)" // Change the number of rows to 2
-          gap="20px"
-          width="70%"
-          
+          gridColumn="span 1"
+          backgroundColor={colors.primary[400]}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
         >
-          <Box
-            gridColumn="span 3"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            gridRow="span 1"
-            
-          >
-            <StatBox
-              title={residentsCount} // Use residentsCount state
-              subtitle="Residents en Formation"
-              icon={<GroupsIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
-            />
-          </Box>
-          <Box
-            gridColumn="span 3"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            gridRow="span 1"
-          >
-            <StatBox
-              title={residentsCount} // Use residentsCount state
-              subtitle="Spécialité médicale"
-              icon={<StarsIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
-            />
-          </Box>
-          <Box
-            gridColumn="span 3"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <StatBox
-              title={residentsCount} // Use residentsCount state
-              subtitle="Salaire Total"
-              icon={<PaidIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
-            />
-          </Box>
-          <Box
-            gridColumn="span 3"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            gridRow="span 1"
-          >
-            <StatBox
-              title={residentsCount} // Use residentsCount state
-              subtitle="Rappel Total"
-              icon={<PaidIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
-            />
-          </Box>
+          <StatBox
+            title={residentsCount}
+            subtitle="Residents en Formation"
+            icon={<GroupsIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
+          />
         </Box>
 
-        {/* Notifications */}
-        <Box width="30%"
-
+        {/* Monthly Payments Stats */}
+        <Box
+          gridColumn="span 1"
+          backgroundColor={colors.primary[400]}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
         >
-          <Notifications />
+          <StatBox
+            title={`${monthlyPaymentsTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH`}
+            subtitle={`Paiements ${currentMonthName} ${currentYear}`}
+            icon={<PaidIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
+          />
+        </Box>
+
+        {/* Monthly Rappels Stats */}
+        <Box
+          gridColumn="span 1"
+          backgroundColor={colors.primary[400]}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <StatBox
+            title={`${monthlyRappelsTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DH`}
+            subtitle={`Rappels ${currentMonthName} ${currentYear}`}
+            icon={<PaidIcon sx={{ color: colors.blueAccent[500], fontSize: "26px" }} />}
+          />
         </Box>
       </Box>
     </Box>

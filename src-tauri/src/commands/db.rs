@@ -1,43 +1,29 @@
-use sqlx::postgres::PgPoolOptions;
-use crate::models::{AppState, DbConfig, Specialite, Resident, MyError, NewSpecialite, NewResident, Banque, PaiementMensuel, RappelAnnuel};
+use crate::models::{AppState, Specialite, Resident, MyError, NewSpecialite, NewResident, Banque, PaiementMensuel, RappelAnnuel};
 use thiserror::Error;
 use bigdecimal::BigDecimal;
 use std::str::FromStr;
 use chrono::{Local, NaiveDate};
-use tauri::{Manager, State};
-use tokio_cron_scheduler::{Job, JobScheduler};
-use std::sync::Arc;
+use tauri::{State};
+use dotenv::dotenv;
+use std::env;
+use sqlx::postgres::PgPoolOptions;
 
 
 #[tauri::command]
-pub async fn connect_db(config: DbConfig, state: State<'_, AppState>) -> Result<String, String> {
-    let connection_str = format!(
-        "postgres://{}:{}@{}:{}/{}",
-        config.user, config.password, config.host, config.port, config.database
-    );
+pub async fn connect_db() -> Result<sqlx::Pool<sqlx::Postgres>, sqlx::Error> {
+    dotenv().ok(); // Load environment variables
 
-    match PgPoolOptions::new()
-        .max_connections(5) // Set the number of connections in the pool
-        .connect(&connection_str)
-        .await
-    {
-        Ok(pool) => {
-            let mut pool_guard = state.pool.lock().await;
-            *pool_guard = Some(pool);
-            // Store credentials in the application state after successful connection
-            let mut credentials_guard = state.db_credentials.lock().await;
-            *credentials_guard = Some(DbConfig {
-                user: config.user,
-                password: config.password,
-                host: config.host,
-                port: config.port,
-                database: config.database,
-            });            
-            Ok("Database connection established successfully.".to_string())
-        },
-        Err(e) => Err(format!("Failed to connect to the database: {}", e)),
-    }
+    // Read the DATABASE_URL from the environment variables
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    // Connect to the database
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url).await?;
+
+    Ok(pool)
 }
+
 //managing banks
 #[tauri::command]
 pub async fn get_banques(state: State<'_, AppState>) -> Result<Vec<Banque>, MyError> {
@@ -154,8 +140,6 @@ pub async fn modify_specialite(pool: State<'_, AppState>, specialite: Specialite
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
-    #[error("Le RIB doit être une valeur numérique")]
-    InvalidRIB,
     #[error("Le nombre d'enfants ne peut pas être négatif")]
     InvalidNumberOfChildren,
     #[error("Veuillez sélectionner une spécialité")]
@@ -213,9 +197,6 @@ impl ValidatableResident for NewResident {
 
 fn validate_resident<R: ValidatableResident>(resident: &R) -> Result<(), String> {
 
-    if !resident.rib().to_string().chars().all(|c| c.is_numeric()) {
-        return Err(ValidationError::InvalidRIB.to_string());
-    }
 
     if resident.nombre_enfants() < 0 {
         return Err(ValidationError::InvalidNumberOfChildren.to_string());
@@ -418,7 +399,7 @@ pub async fn get_paiments(state: State<'_, AppState>) -> Result<Vec<PaiementMens
             montant: BigDecimal::from_str(&record.montant.to_string()).expect("Failed to parse BigDecimal"),
             date_paiement: record.date_paiement,
             nom_resident: record.nom_resident,
-            rib: record.rib_string.map(|rib| rib.parse::<i32>().expect("Failed to parse rib as i32")),
+            rib: record.rib_string.expect("Failed to parse rib as i32"),
             nom_banque: record.nom_banque,
         })
         .collect();
@@ -482,7 +463,7 @@ pub async fn get_rappels(pool: State<'_, AppState>) -> Result<Vec<RappelAnnuel>,
     montant: record.montant.map(|v| BigDecimal::from_str(&v.to_string()).expect("Failed to parse BigDecimal")).expect("montant is None"),
     date_generation: Some(record.date_generation.expect("date_generation is None")),
     nom_resident: record.nom_resident,
-    rib: record.rib.map(|rib| rib.parse::<i32>().expect("Failed to parse rib as i32")),
+    rib: record.rib.expect("Failed to parse rib as i32"),
     nom_banque: record.nom_banque,
     })
     .collect();
@@ -506,40 +487,6 @@ pub async fn generate_rappel(pool: State<'_, AppState>, resident_id: i32) -> Res
     .execute(pool)
     .await
     .map_err(|e| format!("Failed to generate rappel: {}", e))?;
-
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn start_scheduler<R: tauri::Runtime>(manager: tauri::AppHandle<R>) -> Result<(), String> {
-    // Check if the scheduler is already running
-    let state = manager.state::<AppState>();
-    {
-        let pool_guard = state.pool.lock().await;
-        if pool_guard.is_none() {
-            eprintln!("Database pool is not connected.");
-            return Err("Database not connected".to_string());
-        }
-    }
-
-    // Set up the job scheduler
-    let scheduler = JobScheduler::new().await.map_err(|e| format!("Failed to create scheduler: {}", e))?;
-    let manager_arc = Arc::new(manager.clone());
-
-    // Define the job to generate payments
-    let job = Job::new_async("0 0 1 * * *", move |_uuid, _l| {
-        let manager_clone = manager_arc.clone();
-        Box::pin(async move {
-            if let Err(e) = generate_payments(manager_clone.state::<AppState>()).await {
-                eprintln!("Failed to generate payments: {}", e);
-            }
-        })
-    }).map_err(|e| format!("Failed to create job: {}", e))?;
-
-    scheduler.add(job).await.map_err(|e| format!("Failed to add job to scheduler: {}", e))?;
-
-    // Start the scheduler
-    scheduler.start().await.map_err(|e| format!("Failed to start scheduler: {}", e))?;
 
     Ok(())
 }

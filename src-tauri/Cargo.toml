@@ -21,8 +21,7 @@ thiserror = "1.0"
 bigdecimal = { version = "0.3", features = ["serde"] }
 tokio-cron-scheduler = "*"
 tauri-plugin-store = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
-aes = "0.7"
-base64 = "0.21"
+dotenv = "0.15.0"
 
 
 [features]

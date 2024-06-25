@@ -8,37 +8,21 @@ import Sidebar from './global/Sidebar';
 import Dashboard from './scenes/dashboard';
 import Residents from './scenes/residents';
 import Specialties from './scenes/specialties';
-import DbForm from './scenes/dbForm';
 import LoginForm from './scenes/loginForm';
-import { invoke } from '@tauri-apps/api/tauri';
 import Payments from './scenes/payments';
 import Rappels from './scenes/rappel';
 
 function App() {
   const [theme, colorMode] = useMode();
   const [isSidebar, setIsSidebar] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [records, setRecords] = useState([]);
-
-  const listRecords = async () => {
-    try {
-      const result = await invoke('list_record');
-      setRecords(result);
-    } catch (error) {
-      alert('Failed to list records');
-      console.error('Error:', error);
-    }
-  };
 
   return (
     <ColorModeContext.Provider value={colorMode}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <div className="app">
-          {!isConnected ? (
-            <DbForm onConnect={() => setIsConnected(true)} />
-          ) : !isAuthenticated ? (
+          {!isAuthenticated ? (
             <LoginForm onLoginSuccess={() => setIsAuthenticated(true)} />
           ) : (
             <Router>

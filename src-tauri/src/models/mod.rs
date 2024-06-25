@@ -1,10 +1,8 @@
-pub mod db_config;
 pub mod login_payload;
 pub mod specialty;
 pub mod resident;
 pub mod payments;
 
-pub use db_config::DbConfig;
 pub use login_payload::LoginPayload;
 pub use specialty::Specialite;
 pub use resident::Resident;
@@ -15,8 +13,6 @@ pub use payments::PaiementMensuel;
 pub use payments::RappelAnnuel;
 
 use serde::Serialize;
-use sqlx::postgres::PgPool;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize)]
@@ -33,6 +29,5 @@ impl From<sqlx::Error> for MyError {
 }
 
 pub struct AppState {
-    pub pool: Arc<Mutex<Option<PgPool>>>,
-    pub db_credentials: Arc<Mutex<Option<DbConfig>>>,
+    pub pool: Mutex<Option<sqlx::PgPool>>,
 }

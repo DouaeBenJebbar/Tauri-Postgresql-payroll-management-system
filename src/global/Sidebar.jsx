@@ -6,10 +6,12 @@ import "react-pro-sidebar/dist/css/styles.css";
 import { tokens } from "../theme";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
-import ContactsOutlinedIcon from "@mui/icons-material/ContactsOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
+import GradeOutlinedIcon from '@mui/icons-material/GradeOutlined';
+import PaidIcon from '@mui/icons-material/PaidOutlined';
+import { PaidOutlined } from "@mui/icons-material";
 
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
@@ -120,7 +122,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             <Item
               title="Spécialités"
               to="/specialties"
-              icon={<ContactsOutlinedIcon />}
+              icon={< GradeOutlinedIcon/>}
               selected={selected}
               setSelected={setSelected}
             />
@@ -135,7 +137,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }) => {
             <Item
               title="Paiements"
               to="/payments"
-              icon={<PersonOutlinedIcon />}
+              icon={<PaidOutlined/>}
               selected={selected}
               setSelected={setSelected}
             />

@@ -5,8 +5,8 @@
 
 
 use tokio::sync::Mutex;
-use std::sync::Arc;
-use tauri::generate_handler;
+use dotenv::dotenv;
+use std::env;
 
 mod commands;
 mod models;
@@ -37,17 +37,24 @@ use models::AppState;
 
 #[tokio::main]
 async fn main() {
-    // Initialize application state using Arc and Mutex for shared access
-    let state = Arc::new(AppState {
-        pool: Arc::new(Mutex::new(None)),
-        db_credentials: Arc::new(Mutex::new(None)),
-    });
+    dotenv().ok(); // Load environment variables
 
-    // Create a Tauri application builder
+    // Attempt to establish a database connection
+    let db_connection = match connect_db().await {
+        Ok(pool) => {
+            Some(pool)
+        },
+        Err(e) => {
+            eprintln!("Failed to connect to the database: {}", e);
+            None
+        },
+    };
+
     tauri::Builder::default()
-        .manage(state.clone()) // Clone state for Tauri app context
+        .manage(AppState {
+            pool: Mutex::new(db_connection), // Pass the db connection to the AppState
+        }) 
         .invoke_handler(tauri::generate_handler![
-            connect_db,
             login,
             get_banques,
             get_specialites,

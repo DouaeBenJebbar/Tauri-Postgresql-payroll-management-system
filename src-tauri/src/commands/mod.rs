@@ -17,6 +17,5 @@ pub use db::{
     generate_payments,
     get_rappels,
     generate_rappel,
-    start_scheduler,
     get_resident_id
 };

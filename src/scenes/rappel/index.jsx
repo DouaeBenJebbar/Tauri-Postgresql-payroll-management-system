@@ -137,7 +137,7 @@ const Rappels = () => {
         });
       }
   
-      const fileName = `OP-RAP ${selectedMonth} ${selectedYear}.xlsx`;
+      const fileName = `OV-RAP ${selectedMonth} ${selectedYear}.xlsx`;
   
       // Save the modified workbook with the generated file name
       const buffer = await workbook.xlsx.writeBuffer();
@@ -222,12 +222,18 @@ const Rappels = () => {
   };
 
   const formatDaysToPeriod = (days) => {
-    const months = Math.floor(days / 30);
-    const remainingDays = days % 30;
-    const monthsString = months > 0 ? `${months} mois` : "";
-    const daysString = remainingDays > 0 ? `${remainingDays} jours` : "";
-    return `${monthsString}${monthsString && daysString ? " " : ""}${daysString}`;
+    const years = Math.floor(days / 365);
+    const remainingDaysAfterYears = days % 365;
+    const months = Math.floor(remainingDaysAfterYears / 30);
+    const remainingDays = remainingDaysAfterYears % 30;
+  
+    const yearsString = years > 0 ? `${years} ${years > 1 ? 'ans' : 'an'}` : "";
+    const monthsString = months > 0 ? `${months} ${months > 1 ? 'mois' : 'mois'}` : "";
+    const daysString = remainingDays > 0 ? `${remainingDays} ${remainingDays > 1 ? 'jours' : 'jour'}` : "";
+  
+    return `${yearsString}${yearsString && (monthsString || daysString) ? " " : ""}${monthsString}${(yearsString || monthsString) && daysString ? " " : ""}${daysString}`;
   };
+  
 
   const transformData = (rappels) => {
     const groupedByResident = rappels.reduce((acc, rappel) => {

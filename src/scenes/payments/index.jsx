@@ -213,9 +213,10 @@ const Payments = () => {
       secondFooterRowCD.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   
       // Save the modified workbook
+      const fileName = `OV ${selectedMonth} ${selectedYear}.xlsx`;
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      saveAs(blob, 'generatedFile.xlsx');
+      saveAs(blob, fileName);
     } catch (error) {
       console.error('Error generating Excel file from template:', error);
       throw error;
@@ -482,7 +483,8 @@ const Payments = () => {
             fontWeight: "bold",
           }}
         >
-          Montant Total : {totalPayments.toFixed(2)} DH
+          Montant Total : {`${totalPayments.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          DH
         </div>
       </Box>
     )}
