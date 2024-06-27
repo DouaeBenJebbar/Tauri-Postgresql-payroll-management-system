@@ -16,13 +16,18 @@ pub async fn connect_db() -> Result<sqlx::Pool<sqlx::Postgres>, sqlx::Error> {
     // Read the DATABASE_URL from the environment variables
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
+    println!("Connecting to the database...");
+
     // Connect to the database
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url).await?;
 
+    println!("Successfully connected to the database");
+
     Ok(pool)
 }
+
 
 //managing banks
 #[tauri::command]

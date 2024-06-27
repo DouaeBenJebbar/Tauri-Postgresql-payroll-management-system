@@ -39,6 +39,12 @@ use models::AppState;
 async fn main() {
     dotenv().ok(); // Load environment variables
 
+    // Print the DATABASE_URL to verify it's loaded correctly
+    match env::var("DATABASE_URL") {
+        Ok(database_url) => println!("DATABASE_URL: {}", database_url),
+        Err(e) => eprintln!("Error loading DATABASE_URL: {}", e),
+    };
+
     // Attempt to establish a database connection
     let db_connection = match connect_db().await {
         Ok(pool) => {
